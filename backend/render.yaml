@@ -3,10 +3,10 @@ services:
     name: cgpa-fetcher-backend
     env: node
     buildCommand: |
-      apt-get update -y && 
-      apt-get install -y chromium &&
-      cd backend && 
+      cd backend
       npm install
+      apt-get update -y
+      apt-get install -y chromium
     startCommand: cd backend && node index.js
     envVars:
       - key: NODE_ENV
