@@ -3,7 +3,29 @@ import cors from 'cors';
 import puppeteer from 'puppeteer';
 
 const app = express();
-app.use(cors());
+
+// Environment variables
+const PORT = process.env.PORT || 5000;
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:5173').split(',');
+
+// CORS configuration
+const corsOptions = {
+    origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+
+        if (ALLOWED_ORIGINS.indexOf(origin) !== -1 || NODE_ENV === 'development') {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    methods: ['GET', 'POST'],
+    credentials: true
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
 const debug = (msg) => console.log(`[DEBUG] ${msg}`);
@@ -271,4 +293,4 @@ app.post('/fetch-grade', async (req, res) => {
     }
 });
 
-app.listen(5000, () => console.log('Backend running on port 5000')); 
+app.listen(PORT, () => console.log(`Backend running on port ${PORT} in ${NODE_ENV} mode`)); 

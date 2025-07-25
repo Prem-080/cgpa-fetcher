@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: cgpa-fetcher-backend
+    env: node
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && node index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+    autoDeploy: true
