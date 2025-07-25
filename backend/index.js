@@ -42,13 +42,16 @@ app.post('/fetch-grade', async (req, res) => {
     try {
         debug('Launching browser...');
         browser = await puppeteer.launch({
-            headless: "new",  // Use new headless mode
+            headless: "new",
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-gpu',
                 '--disable-dev-shm-usage',
+                '--single-process',
+                '--no-zygote'
             ],
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || null,
             defaultViewport: { width: 1280, height: 800 }
         });
 

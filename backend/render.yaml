@@ -2,9 +2,17 @@ services:
   - type: web
     name: cgpa-fetcher-backend
     env: node
-    buildCommand: cd backend && npm install
+    buildCommand: |
+      apt-get update -y && 
+      apt-get install -y chromium &&
+      cd backend && 
+      npm install
     startCommand: cd backend && node index.js
     envVars:
       - key: NODE_ENV
         value: production
+      - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
+        value: true
+      - key: PUPPETEER_EXECUTABLE_PATH
+        value: /usr/bin/chromium
     autoDeploy: true
