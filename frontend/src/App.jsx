@@ -110,7 +110,7 @@ function App() {
       <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
         <h1 className="text-2xl font-bold mb-4">CGPA Fetcher</h1>
         {/* Enter Semester */}
-        <FormControl fullWidth variant="outlined">
+        <FormControl fullWidth variant="outlined" className="mb-4">
             <InputLabel>Select Semester</InputLabel>
             <Select
               value={semester}
@@ -127,7 +127,7 @@ function App() {
           </FormControl>
 
         {/* Enter Roll Number */}
-        <div className="space-y-4">
+        <div className="space-y-4 mb-4">
           <TextField
             label="Enter Roll Number"
             value={roll}
