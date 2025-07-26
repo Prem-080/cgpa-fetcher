@@ -93,7 +93,9 @@ app.post('/fetch-grade', async (req, res) => {
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox'
-            ]
+            ],
+            // Use Chrome from node_modules
+            executablePath: './node_modules/puppeteer/.local-chromium/linux-*/chrome-linux/chrome'
         });
 
         const page = await browser.newPage();
