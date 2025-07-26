@@ -15,8 +15,10 @@ const corsOptions = {
         const allowedOrigins = [
             'http://localhost:3000',
             'http://localhost:5173',
-            'https://cgpa-fetcher.vercel.app',  // Add your Vercel frontend URL when deployed
-            'https://cgpa-fetcher-frontend.vercel.app'
+            'https://cgpa-fetcher.vercel.app',
+            'https://cgpa-fetcher-prem-080s-projects.vercel.app',
+            'https://cgpa-fetcher-git-main-prem-080s-projects.vercel.app',
+            'https://cgpa-fetcher-7c93752lh-prem-080s-projects.vercel.app'
         ];
 
         // Allow requests with no origin (like mobile apps or curl requests)
