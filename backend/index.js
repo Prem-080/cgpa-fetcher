@@ -60,7 +60,7 @@ app.post('/fetch-grade', async (req, res) => {
                 '--single-process',
                 '--no-zygote'
             ],
-            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || null,
+            executablePath: '/usr/bin/google-chrome',
             defaultViewport: { width: 1280, height: 800 }
         });
 
