@@ -3,6 +3,12 @@ services:
     name: cgpa-fetcher-backend
     env: node
     rootDir: backend
-    buildCommand: npm install
+    buildCommand: |
+      apt-get update && apt-get install -y chromium \
+      && npm install
     startCommand: node index.js
-    envVars: []
+    envVars:
+      - key: PUPPETEER_EXECUTABLE_PATH
+        value: "/usr/bin/chromium"
+      - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
+        value: "true"

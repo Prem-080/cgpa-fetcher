@@ -88,15 +88,11 @@ app.post('/fetch-grade', async (req, res) => {
     let cgpa = '-';
     try {
         debug('Launching browser...');
-        browser = await puppeteer.launch({
+        const browser = await puppeteer.launch({
             headless: "new",
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu'
-            ]
-        });
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
+          });
 
         const page = await browser.newPage();
 
