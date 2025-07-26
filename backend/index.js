@@ -76,6 +76,7 @@ app.get('/health', (req, res) => {
 });
 
 const debug = (msg) => console.log(`[DEBUG] ${msg}`);
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 app.post('/fetch-grade', async (req, res) => {
     const roll = req.body.roll.toUpperCase();
@@ -115,7 +116,7 @@ app.post('/fetch-grade', async (req, res) => {
         });
 
         // Wait for page to be fully loaded
-        await page.waitForTimeout(2000);
+        await sleep(2000);
 
         debug('Looking for Logins link...');
         // Try multiple selector strategies for "Logins"
@@ -142,7 +143,7 @@ app.post('/fetch-grade', async (req, res) => {
             throw new Error('Could not find Logins button. Is the website structure changed?');
         }
 
-        await page.waitForTimeout(2000);
+        await sleep(2000);
         debug('Looking for Student Login link...');
 
         // Try to find and click "Student Login"
@@ -188,7 +189,7 @@ app.post('/fetch-grade', async (req, res) => {
         await page.type('#txtPwd', roll, { delay: 100 });
         await page.click('#btnLogin');
 
-        await page.waitForTimeout(2000);
+        await sleep(2000);
 
         // Start name extraction asynchronously
         const namePromise = (async () => {
@@ -226,7 +227,7 @@ app.post('/fetch-grade', async (req, res) => {
                 if (marks) marks.click();
             });
 
-            await page.waitForTimeout(2000);
+            await sleep(2000);
 
             await page.evaluate(() => {
                 const links = Array.from(document.querySelectorAll('a'));
@@ -238,7 +239,7 @@ app.post('/fetch-grade', async (req, res) => {
             throw new Error('Could not access marks section');
         }
 
-        await page.waitForTimeout(2000);
+        await sleep(2000);
 
         debug('Selecting semester...');
         // Select semester based on the parameter
@@ -272,7 +273,7 @@ app.post('/fetch-grade', async (req, res) => {
             const [semBtn] = await page.$x(`//input[contains(@value, '${semesterText}')]`);
             if (semBtn) {
                 await semBtn.click();
-                await page.waitForTimeout(2000);
+                await sleep(2000);
             } else {
                 throw new Error(`Semester button not found for ${semesterText}`);
             }
