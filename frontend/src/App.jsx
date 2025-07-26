@@ -127,7 +127,7 @@ function App() {
           </FormControl>
 
         {/* Enter Roll Number */}
-        <div className="">
+        <div className="mt-4">
           <TextField
             label="Enter Roll Number"
             value={roll}
@@ -137,9 +137,10 @@ function App() {
             onKeyDown={e => e.key === 'Enter' && !loading && fetchCGPA()}
             disabled={loading}
           />
+        </div>
 
         {/* Fetch CGPA */}
-
+        <div className="mt-4">
           <Button
             variant="contained"
             color="primary"
