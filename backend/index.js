@@ -270,9 +270,18 @@ app.post('/fetch-grade', async (req, res) => {
                 throw new Error(`Results for ${semesterMap[semester]} are not available yet`);
             }
 
-            const [semBtn] = await page.$x(`//input[contains(@value, '${semesterText}')]`);
-            if (semBtn) {
-                await semBtn.click();
+            // Find and click the semester button using evaluate
+            const buttonClicked = await page.evaluate((semText) => {
+                const inputs = Array.from(document.querySelectorAll('input[type="submit"]'));
+                const targetButton = inputs.find(input => input.value && input.value.includes(semText));
+                if (targetButton) {
+                    targetButton.click();
+                    return true;
+                }
+                return false;
+            }, semesterText);
+
+            if (buttonClicked) {
                 await sleep(2000);
             } else {
                 throw new Error(`Semester button not found for ${semesterText}`);
