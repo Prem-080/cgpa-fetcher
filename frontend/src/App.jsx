@@ -110,7 +110,7 @@ function App() {
       <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
         <h1 className="text-2xl font-bold mb-4">CGPA Fetcher</h1>
         {/* Enter Semester */}
-        <FormControl fullWidth variant="outlined" className="mb-4">
+        <FormControl fullWidth variant="outlined" className="mb-4 space-y-4">
             <InputLabel>Select Semester</InputLabel>
             <Select
               value={semester}
