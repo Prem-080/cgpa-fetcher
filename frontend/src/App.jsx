@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { Button, TextField, CircularProgress, Snackbar, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
-import { Alert } from '@mui/material';
+import { Button, TextField, CircularProgress, Snackbar, Select, MenuItem, FormControl, InputLabel, Alert } from '@mui/material';
 import Lottie from 'lottie-react';
 import animationData from './fetching.json';
-import { API_URL } from './config';
+import API_URL from './config';
 
 function App() {
   const [roll, setRoll] = useState('');
@@ -59,7 +58,10 @@ function App() {
       const res = await fetch(`${API_URL}/fetch-grade`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roll, semester }),
+        body: JSON.stringify({ 
+          roll: roll.trim().toUpperCase(),  // Ensure roll number is uppercase
+          semester 
+        }),
       });
       
       const data = await res.json();
