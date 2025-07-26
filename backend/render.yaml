@@ -3,6 +3,6 @@ services:
     name: cgpa-fetcher-backend
     env: docker
     rootDir: backend
-    dockerfilePath: Dockerfile
+    dockerfilePath: backend/Dockerfile
     plan: free
     envVars: []
