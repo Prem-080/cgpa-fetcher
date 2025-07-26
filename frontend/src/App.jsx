@@ -201,7 +201,7 @@ function App() {
                     <img
                       src={`data:image/png;base64,${s.data}`}
                       alt={`${s.name} preview`}
-                      className="w-[60rem] max-w-none border-4 border-white rounded-lg shadow-xl transition-transform duration-200 scale-50 bg-white"
+                      className="w-[60rem] max-w-none border-4 border-white rounded-lg shadow-xl transition-transform duration-200 scale-y-50 scale-x-100 bg-white"
                     />
                   </div>
                 </div>
