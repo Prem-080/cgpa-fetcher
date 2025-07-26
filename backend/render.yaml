@@ -3,6 +3,6 @@ services:
     name: cgpa-fetcher-backend
     env: node
     rootDir: backend
-               buildCommand: npm install
+    buildCommand: npm install
     startCommand: node index.js
-               envVars: []
+    envVars: []
