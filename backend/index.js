@@ -51,16 +51,15 @@ app.post('/fetch-grade', async (req, res) => {
     try {
         debug('Launching browser...');
         browser = await puppeteer.launch({
-            headless: "new",
+            headless: true,  // Use regular headless mode instead of "new"
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
-                '--disable-gpu',
                 '--disable-dev-shm-usage',
-                '--single-process',
-                '--no-zygote'
+                '--single-process'
             ],
-            executablePath: '/usr/bin/google-chrome',
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+            ignoreDefaultArgs: ['--disable-extensions'],
             defaultViewport: { width: 1280, height: 800 }
         });
 

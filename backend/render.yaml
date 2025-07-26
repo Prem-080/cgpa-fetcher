@@ -3,8 +3,15 @@ services:
     name: cgpa-fetcher-backend
     env: node
     rootDir: backend
-    buildCommand: npm install
+    buildCommand: |
+      apt-get update && apt-get install -y wget gnupg
+      wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
+      echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list
+      apt-get update && apt-get install -y google-chrome-stable
+      npm install
     startCommand: node index.js
     envVars:
+      - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
+        value: "true"
       - key: PUPPETEER_EXECUTABLE_PATH
-        value: /usr/bin/chromium-browser
+        value: "/usr/bin/google-chrome"
