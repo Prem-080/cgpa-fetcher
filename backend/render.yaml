@@ -1,14 +1,8 @@
 services:
   - type: web
     name: cgpa-fetcher-backend
-    env: node
+    env: docker
     rootDir: backend
-    buildCommand: |
-      apt-get update && apt-get install -y chromium \
-      && npm install
-    startCommand: node index.js
-    envVars:
-      - key: PUPPETEER_EXECUTABLE_PATH
-        value: "/usr/bin/chromium"
-      - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
-        value: "true"
+    dockerfilePath: Dockerfile
+    plan: free
+    envVars: []
