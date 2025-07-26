@@ -3,11 +3,6 @@ services:
     name: cgpa-fetcher-backend
     env: node
     rootDir: backend
-    buildCommand: |
-      mkdir -p /tmp/chrome
-      chmod -R 777 /tmp/chrome
-      npm install
+               buildCommand: npm install
     startCommand: node index.js
-    envVars:
-      - key: PUPPETEER_CACHE_DIR
-        value: /tmp/chrome
+               envVars: []
