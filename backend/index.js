@@ -89,16 +89,11 @@ app.post('/fetch-grade', async (req, res) => {
     try {
         debug('Launching browser...');
         browser = await puppeteer.launch({
-            headless: true,  // Use regular headless mode instead of "new"
+            headless: true,
             args: [
                 '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--single-process'
-            ],
-            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-            ignoreDefaultArgs: ['--disable-extensions'],
-            defaultViewport: { width: 1280, height: 800 }
+                '--disable-setuid-sandbox'
+            ]
         });
 
         const page = await browser.newPage();
