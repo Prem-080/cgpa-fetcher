@@ -127,7 +127,7 @@ function App() {
           </FormControl>
 
         {/* Enter Roll Number */}
-        <div className="space-y-4 mb-4">
+        <div className="">
           <TextField
             label="Enter Roll Number"
             value={roll}
