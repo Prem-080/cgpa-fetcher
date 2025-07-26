@@ -37,6 +37,44 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
+// Root route - API documentation
+app.get('/', (req, res) => {
+    res.json({
+        status: 'API is running',
+        endpoints: {
+            '/': {
+                method: 'GET',
+                description: 'API documentation and health check'
+            },
+            '/fetch-grade': {
+                method: 'POST',
+                description: 'Fetch CGPA for a student',
+                body: {
+                    roll: 'Student roll number (required)',
+                    semester: 'Semester selection (required)'
+                },
+                example: {
+                    request: {
+                        roll: '20XX1A0XXX',
+                        semester: 'II_II'
+                    },
+                    response: {
+                        cgpa: '8.5',
+                        studentName: 'Student Name',
+                        screenshots: ['...']
+                    }
+                }
+            }
+        },
+        frontend: 'https://cgpa-fetcher.vercel.app'
+    });
+});
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+    res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+});
+
 const debug = (msg) => console.log(`[DEBUG] ${msg}`);
 
 app.post('/fetch-grade', async (req, res) => {
