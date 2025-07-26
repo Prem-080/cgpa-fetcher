@@ -1,30 +1,26 @@
 import express from 'express';
 import cors from 'cors';
 import puppeteer from 'puppeteer';
+import dotenv from 'dotenv';
 
-const app = express();
+if (process.env.NODE_ENV === 'production') {
+    dotenv.config({ path: '.env.production' });
+} else {
+    dotenv.config({ path: '.env.development' });
+}
 
-// Environment variables
+
 const PORT = process.env.PORT || 5000;
-const NODE_ENV = process.env.NODE_ENV || 'development';
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:5173').split(',');
 
-// CORS configuration
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map(origin => origin.trim());
+
 const corsOptions = {
     origin: (origin, callback) => {
-        const allowedOrigins = [
-            'http://localhost:3000',
-            'http://localhost:5173',
-            'https://cgpa-fetcher.vercel.app',
-            'https://cgpa-fetcher-prem-080s-projects.vercel.app',
-            'https://cgpa-fetcher-git-main-prem-080s-projects.vercel.app',
-            'https://cgpa-fetcher-7c93752lh-prem-080s-projects.vercel.app'
-        ];
-
-        // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
 
-        if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
+        if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
             callback(null, true);
         } else {
             callback(new Error('Not allowed by CORS'));
@@ -34,49 +30,15 @@ const corsOptions = {
     credentials: true
 };
 
+
+const app = express();
 app.use(cors(corsOptions));
 app.use(express.json());
 
-// Root route - API documentation
-app.get('/', (req, res) => {
-    res.json({
-        status: 'API is running',
-        endpoints: {
-            '/': {
-                method: 'GET',
-                description: 'API documentation and health check'
-            },
-            '/fetch-grade': {
-                method: 'POST',
-                description: 'Fetch CGPA for a student',
-                body: {
-                    roll: 'Student roll number (required)',
-                    semester: 'Semester selection (required)'
-                },
-                example: {
-                    request: {
-                        roll: '20XX1A0XXX',
-                        semester: 'II_II'
-                    },
-                    response: {
-                        cgpa: '8.5',
-                        studentName: 'Student Name',
-                        screenshots: ['...']
-                    }
-                }
-            }
-        },
-        frontend: 'https://cgpa-fetcher.vercel.app'
-    });
-});
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-    res.json({ status: 'healthy', timestamp: new Date().toISOString() });
-});
-
 const debug = (msg) => console.log(`[DEBUG] ${msg}`);
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Helper function for delays
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 app.post('/fetch-grade', async (req, res) => {
     const roll = req.body.roll.toUpperCase();
@@ -94,29 +56,25 @@ app.post('/fetch-grade', async (req, res) => {
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
+                '--disable-gpu',
                 '--disable-dev-shm-usage',
-                '--disable-gpu'
             ],
-            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH
+            defaultViewport: { width: 1280, height: 800 }
         });
 
         const page = await browser.newPage();
 
         // Enable console log from browser
-        page.on('console', msg => {
-            if (!msg.text().includes('autocomplete')) {
-                debug(`Browser Console: ${msg.text()}`);
-            }
-        });
+        page.on('console', msg => debug(`Browser Console: ${msg.text()}`));
 
         debug('Navigating to login page...');
         await page.goto('https://www.tkrcetautonomous.org/Login.aspx', {
-            waitUntil: ['domcontentloaded', 'networkidle0', 'load'],
-            timeout: 30000
+            waitUntil: ['domcontentloaded', 'networkidle0'],
+            timeout: 15000
         });
 
         // Wait for page to be fully loaded
-        await sleep(2000);
+        await delay(500);
 
         debug('Looking for Logins link...');
         // Try multiple selector strategies for "Logins"
@@ -126,7 +84,7 @@ app.post('/fetch-grade', async (req, res) => {
                     const links = Array.from(document.querySelectorAll('a'));
                     return links.some(link => link.textContent.includes('Logins'));
                 },
-                { timeout: 10000 }
+                { timeout: 5000 }
             );
 
             await page.evaluate(() => {
@@ -143,7 +101,7 @@ app.post('/fetch-grade', async (req, res) => {
             throw new Error('Could not find Logins button. Is the website structure changed?');
         }
 
-        await sleep(2000);
+        await delay(300);
         debug('Looking for Student Login link...');
 
         // Try to find and click "Student Login"
@@ -153,7 +111,7 @@ app.post('/fetch-grade', async (req, res) => {
                     const links = Array.from(document.querySelectorAll('a'));
                     return links.some(link => link.textContent.includes('Student Login'));
                 },
-                { timeout: 10000 }
+                { timeout: 5000 }
             );
 
             await page.evaluate(() => {
@@ -171,44 +129,35 @@ app.post('/fetch-grade', async (req, res) => {
         }
 
         // Wait for navigation and login form
-        await page.waitForNavigation({ waitUntil: 'networkidle0', timeout: 10000 });
+        await page.waitForNavigation({ waitUntil: 'networkidle0', timeout: 8000 });
         debug('Entering credentials...');
 
-        // Login form with autocomplete attributes
-        await page.waitForSelector('#txtUserId', { visible: true, timeout: 10000 });
-
-        // Add autocomplete attributes to the form fields
-        await page.evaluate(() => {
-            const userIdField = document.getElementById('txtUserId');
-            const passwordField = document.getElementById('txtPwd');
-            if (userIdField) userIdField.setAttribute('autocomplete', 'username');
-            if (passwordField) passwordField.setAttribute('autocomplete', 'current-password');
-        });
-
-        await page.type('#txtUserId', roll, { delay: 100 });
-        await page.type('#txtPwd', roll, { delay: 100 });
+        // Login form
+        await page.waitForSelector('#txtUserId', { visible: true, timeout: 5000 });
+        await page.type('#txtUserId', roll, { delay: 50 });
+        await page.type('#txtPwd', roll, { delay: 50 });
         await page.click('#btnLogin');
 
-        await sleep(2000);
+        // Wait for navigation after login with shorter timeout
+        await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 5000 });
+        await delay(300);
 
-        // Start name extraction asynchronously
-        const namePromise = (async () => {
-            try {
-                const name = await page.evaluate(() => {
-                    const nameElement = document.getElementById('lblStudName');
-                    return nameElement ? nameElement.innerText.trim() : '';
-                });
-                if (name) {
-                    debug(`Found student name: ${name}`);
-                    return name;
-                }
+        // Extract student name after login
+        debug('Extracting student name...');
+        let studentName = '';
+        try {
+            // Extract name asynchronously
+            studentName = await page.$eval('#lblStudName', el => el.innerText.trim());
+
+            if (studentName) {
+                debug(`Found student name: ${studentName}`);
+            } else {
                 debug('No student name found');
-                return '';
-            } catch (e) {
-                debug(`Error finding student name: ${e.message}`);
-                return '';
             }
-        })();
+        } catch (e) {
+            debug(`Error finding student name: ${e.message}`);
+            debug('Will continue without student name');
+        }
 
         debug('Looking for Marks Details...');
         // Navigate to marks
@@ -218,7 +167,7 @@ app.post('/fetch-grade', async (req, res) => {
                     const links = Array.from(document.querySelectorAll('a'));
                     return links.some(link => link.textContent.includes('Marks Details'));
                 },
-                { timeout: 10000 }
+                { timeout: 3000 }
             );
 
             await page.evaluate(() => {
@@ -227,19 +176,24 @@ app.post('/fetch-grade', async (req, res) => {
                 if (marks) marks.click();
             });
 
-            await sleep(2000);
+            // Wait for navigation after clicking Marks Details with shorter timeout
+            await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 5000 });
+            await delay(200);
 
             await page.evaluate(() => {
                 const links = Array.from(document.querySelectorAll('a'));
                 const overall = links.find(a => a.textContent.includes('Overall Marks - Semwise'));
                 if (overall) overall.click();
             });
+
+            // Wait for navigation after clicking Overall Marks with shorter timeout
+            await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 5000 });
         } catch (e) {
             debug(`Failed to navigate to marks: ${e.message}`);
             throw new Error('Could not access marks section');
         }
 
-        await sleep(2000);
+        await delay(500);
 
         debug('Selecting semester...');
         // Select semester based on the parameter
@@ -260,52 +214,31 @@ app.post('/fetch-grade', async (req, res) => {
                 throw new Error('Invalid semester selection');
             }
 
-            // Check if the semester results exist
-            const semesterExists = await page.evaluate((semText) => {
-                const inputs = Array.from(document.querySelectorAll('input[type="submit"]'));
-                return inputs.some(input => input.value && input.value.includes(semText));
-            }, semesterText);
-
-            if (!semesterExists) {
-                throw new Error(`Results for ${semesterMap[semester]} are not available yet`);
-            }
-
-            // Find and click the semester button using evaluate
-            const buttonClicked = await page.evaluate((semText) => {
-                const inputs = Array.from(document.querySelectorAll('input[type="submit"]'));
-                const targetButton = inputs.find(input => input.value && input.value.includes(semText));
-                if (targetButton) {
-                    targetButton.click();
+            // Use page.evaluate instead of page.$x
+            const semBtn = await page.evaluate((semText) => {
+                const inputs = Array.from(document.querySelectorAll('input'));
+                const btn = inputs.find(input => input.value && input.value.includes(semText));
+                if (btn) {
+                    btn.click();
                     return true;
                 }
                 return false;
             }, semesterText);
 
-            if (buttonClicked) {
-                await sleep(2000);
+            if (semBtn) {
+                await delay(500);
             } else {
                 throw new Error(`Semester button not found for ${semesterText}`);
             }
-
-            // Verify if we got the correct semester page
-            const correctSemester = await page.evaluate((semText) => {
-                const pageContent = document.body.innerText;
-                return pageContent.includes(`You are Seeing - ${semText}`);
-            }, semesterText);
-
-            if (!correctSemester) {
-                throw new Error(`Unable to load results for ${semesterMap[semester]}`);
-            }
-
         } catch (e) {
             debug(`Failed to select semester: ${e.message}`);
-            throw new Error(`Could not access semester results: ${e.message}`);
+            throw new Error(`Could not select semester: ${e.message}`);
         }
 
         debug('Waiting for CGPA element...');
         try {
             // Wait for the CGPA element to be present
-            await page.waitForSelector('#cpStudCorner_lblFinalCGPA', { timeout: 10000 });
+            await page.waitForSelector('#cpStudCorner_lblFinalCGPA', { timeout: 5000 });
 
             // Extract CGPA
             cgpa = await page.evaluate(() => {
@@ -322,20 +255,12 @@ app.post('/fetch-grade', async (req, res) => {
             // Take a screenshot of the final result
             screenshots.push({
                 name: `${roll}_${semester}_cgpa`,
-                data: await page.screenshot({
-                    encoding: 'base64',
-                    fullPage: true,
-                    type: 'png',
-                    omitBackground: false
-                })
+                data: await page.screenshot({ encoding: 'base64' })
             });
         } catch (e) {
             debug(`Failed to extract CGPA: ${e.message}`);
             throw new Error('Could not retrieve CGPA');
         }
-
-        // Wait for name extraction to complete and get the result
-        const studentName = await namePromise;
 
         debug('Process completed successfully');
         res.json({ cgpa, screenshots, studentName });
@@ -350,4 +275,4 @@ app.post('/fetch-grade', async (req, res) => {
     }
 });
 
-app.listen(PORT, () => console.log(`Backend running on port ${PORT} in ${NODE_ENV} mode`)); 
+app.listen(5000, () => console.log('Backend running on port 5000')); 

@@ -1,94 +1,53 @@
-# CGPA Fetcher Web App
+# Fast Discrete Grade Fetcher (Web Version)
 
-A modern web application to fetch and display student CGPA and semester results.
+A modern, responsive web app to fetch student grades automatically using browser automation.
 
 ## Features
 
-- 🎓 Fetch CGPA for any semester
-- 📱 Responsive, modern UI
-- 📸 Screenshot capture of results
-- 🚀 Real-time progress tracking
-- 🔒 Secure credential handling
+- Responsive, animated UI (React + Tailwind CSS + Lottie)
+- Backend automation with Puppeteer (Node.js)
+- Downloadable screenshots
+- Fast, user-friendly experience
 
-## Tech Stack
+## Project Structure
 
-### Frontend
-
-- React
-- Material-UI
-- Tailwind CSS
-- Vite
-
-### Backend
-
-- Node.js
-- Express
-- Puppeteer
+```
+Fetch Grade - 2/
+  backend/         # Node.js + Puppeteer API
+  frontend/        # React app (UI)
+  README.md
+```
 
 ## Setup Instructions
 
-### Prerequisites
+### 1. Backend (Node.js + Puppeteer)
 
-- Node.js (v16 or higher)
-- npm
-
-### Backend Setup
-
-```bash
+```
 cd backend
 npm install
 npm start
 ```
 
-Server runs on http://localhost:5000
+- Runs on http://localhost:5000
 
-### Frontend Setup
+### 2. Frontend (React)
 
-```bash
+```
 cd frontend
 npm install
-npm run dev
+npm start
 ```
 
-App runs on http://localhost:3000
+- Runs on http://localhost:3000
 
-## Environment Variables
+### 3. Usage
 
-### Frontend (.env)
+- Open the frontend in your browser.
+- Enter your roll number and fetch your grade!
 
-```
-VITE_API_URL=http://localhost:5000
-```
+---
 
-### Backend (.env)
+**Note:**
 
-```
-PORT=5000
-NODE_ENV=development
-```
-
-## Deployment
-
-### Backend (Render)
-
-- Runtime: Node
-- Build Command: `npm install`
-- Start Command: `node index.js`
-
-### Frontend (Vercel)
-
-- Framework: Vite
-- Build Command: `npm run build`
-- Output Directory: `dist`
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+- Make sure Node.js (v16+) and npm are installed.
+- Puppeteer will download a compatible Chromium browser on first install.

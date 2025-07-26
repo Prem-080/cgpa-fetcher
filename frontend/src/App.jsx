@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { Button, TextField, CircularProgress, Snackbar, Select, MenuItem, FormControl, InputLabel, Alert } from '@mui/material';
 import Lottie from 'lottie-react';
 import animationData from './fetching.json';
-import API_URL from './config';
+import { VITE_API_URL } from './config';
+
 
 // Main App
 function App() {
@@ -15,9 +16,10 @@ function App() {
   const [error, setError] = useState('');
   const [logs, setLogs] = useState([]);
   const [semester, setSemester] = useState('');
+  const [processingTime, setProcessingTime] = useState('');
 
-  // Semester Options
-  const semesters = [
+  // Memoized semester options (no need to recreate on every render)
+  const semesters = useMemo(() => [
     { value: 'I_I', label: 'I Year I Semester' },
     { value: 'I_II', label: 'I Year II Semester' },
     { value: 'II_I', label: 'II Year I Semester' },
@@ -26,29 +28,37 @@ function App() {
     { value: 'III_II', label: 'III Year II Semester' },
     { value: 'IV_I', label: 'IV Year I Semester' },
     { value: 'IV_II', label: 'IV Year II Semester' }
-  ];
+  ], []);
 
-  // Sleep Function
-  const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-  // Add Log Function to console
-  const addLog = async (message) => {
+  // Optimized add log function (no artificial delay)
+  const addLog = useCallback((message) => {
     const timestamp = new Date().toLocaleTimeString();
     setLogs(prev => [...prev, `[${timestamp}] ${message}`]);
-    await sleep(500);
-  };
+  }, []);
 
-  // Fetch CGPA Function
-  const fetchCGPA = async () => {
+  // Input validation
+  const validateInputs = useCallback(() => {
     if (!roll.trim()) {
       setError('Please enter a roll number');
-      return;
+      return false;
     }
-
     if (!semester) {
       setError('Please select a semester');
-      return;
+      return false;
     }
+    // Basic roll number format validation
+    const rollPattern = /^[0-9]{2}[A-Z0-9]{2}[0-9][A-Z][0-9]{4}$/i;
+    if (!rollPattern.test(roll.trim())) {
+      setError('Please enter a valid roll number format (e.g., 20XX1A0XXX)');
+      return false;
+    }
+    return true;
+  }, [roll, semester]);
+
+  // Optimized fetch function with better error handling and timing
+  const fetchCGPA = useCallback(async () => {
+    if (!validateInputs()) return;
+
     // Reset all states
     setLogs([]);
     setLoading(true);
@@ -56,179 +66,295 @@ function App() {
     setStudentName('');
     setScreenshots([]);
     setError('');
+    setProcessingTime('');
+    
+    const startTime = Date.now();
     
     try {
-      await addLog(`Starting CGPA fetch for roll: ${roll}, semester: ${semester}`);
+      addLog(`🚀 Starting CGPA fetch for ${roll.toUpperCase()}, ${semester}`);
+      addLog('📡 Connecting to server...');
       
-      await addLog('Making API request...');
-      const res = await fetch(`${API_URL}/fetch-grade`, {
+      // Add timeout to prevent hanging requests
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000); // 15 second timeout
+      const res = await fetch(`${VITE_API_URL}/fetch-grade`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          roll: roll.trim().toUpperCase(),  // Ensure roll number is uppercase
+          roll: roll.trim().toUpperCase(),
           semester 
         }),
+        signal: controller.signal
       });
       
+      clearTimeout(timeoutId);
+      
+      if (!res.ok) {
+        throw new Error(`Server error: ${res.status} ${res.statusText}`);
+      }
+      
       const data = await res.json();
-      await addLog(`API Response received`);
+      const clientTime = Date.now() - startTime;
+      
+      addLog(`✅ Response received in ${clientTime}ms`);
+      
+      // Show server processing time if available
+      if (data.processingTime) {
+        setProcessingTime(data.processingTime);
+        addLog(`⚡ Server processing: ${data.processingTime}`);
+      }
       
       if (data.error) {
-        await addLog(`Error from API: ${data.error}`);
-        // Check for semester-specific errors
-        if (data.error.includes('semester') || data.error.includes('SEMES')) {
+        addLog(`❌ Server error: ${data.error}`);
+        // Enhanced error handling for different error types
+        if (data.error.includes('not available yet') || data.error.includes('semester')) {
           setError(`⚠️ ${data.error}`);
+        } else if (data.error.includes('CGPA not found')) {
+          setError('❌ CGPA not found. Please check your roll number and try again.');
+        } else if (data.error.includes('Could not find')) {
+          setError('🔍 Login failed. Please verify your roll number or try again later.');
         } else {
-          throw new Error(data.error);
+          setError(`❌ ${data.error}`);
         }
         return;
       }
 
+      // Success path with better logging
       if (data.studentName) {
-        await addLog(`Student Name: ${data.studentName}`);
+        addLog(`👤 Student: ${data.studentName}`);
         setStudentName(data.studentName);
       }
       
-      await addLog(`CGPA found: ${data.cgpa}`);
-      setCgpa(data.cgpa);
+      if (data.cgpa) {
+        addLog(`🎯 CGPA: ${data.cgpa}`);
+        setCgpa(data.cgpa);
+      }
       
       if (data.screenshots && data.screenshots.length > 0) {
-        await addLog(`Received ${data.screenshots.length} screenshots`);
+        addLog(`📸 Screenshots: ${data.screenshots.length} received`);
         setScreenshots(data.screenshots);
       }
+      
+      addLog(`🎉 Fetch completed successfully in ${clientTime}ms`);
+      
     } catch (e) {
-      await addLog(`Error occurred: ${e.message}`);
-      setError(`❌ ${e.message}`);
+      const clientTime = Date.now() - startTime;
+      
+      if (e.name === 'AbortError') {
+        addLog(`⏰ Request timed out after 30 seconds`);
+        setError('⏰ Request timed out. Please try again.');
+      } else if (e.message.includes('Failed to fetch')) {
+        addLog(`🌐 Network error: Unable to connect to server`);
+        setError('🌐 Network error. Please check your internet connection.');
+      } else {
+        addLog(`💥 Error after ${clientTime}ms: ${e.message}`);
+        setError(`❌ ${e.message}`);
+      }
     } finally {
-      await addLog('Fetch process completed');
       setLoading(false);
     }
-  };
-  // Main UI
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-100 to-purple-200">
-      <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
-        <h1 className="text-2xl font-bold mb-4">CGPA Fetcher</h1>
-        {/* Enter Semester */}
-        <FormControl fullWidth variant="outlined" className="mb-4">
-            <InputLabel>Select Semester</InputLabel>
-            <Select
-              value={semester}
-              onChange={e => setSemester(e.target.value)}
-              label="Select Semester"
-              disabled={loading}
-            >
-              {semesters.map(sem => (
-                <MenuItem key={sem.value} value={sem.value}>
-                  {sem.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+  }, [roll, semester, validateInputs, addLog]);
 
-        {/* Enter Roll Number */}
-        <div className="mt-4">
-          <TextField
-            label="Enter Roll Number"
-            value={roll}
-            onChange={e => setRoll(e.target.value)}
-            fullWidth
-            variant="outlined"
-            onKeyDown={e => e.key === 'Enter' && !loading && fetchCGPA()}
-            disabled={loading}
+  // Handle Enter key press
+  const handleKeyPress = useCallback((e) => {
+    if (e.key === 'Enter' && !loading) {
+      fetchCGPA();
+    }
+  }, [fetchCGPA, loading]);
+
+  // Handle roll number input with auto-formatting
+  const handleRollChange = useCallback((e) => {
+    const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (value.length <= 10) { // Standard roll number length
+      setRoll(value);
+      // Clear error when user starts typing
+      if (error) setError('');
+    }
+  }, [error]);
+
+  // Handle semester change
+  const handleSemesterChange = useCallback((e) => {
+    setSemester(e.target.value);
+    // Clear error when user selects semester
+    if (error) setError('');
+  }, [error]);
+
+  // Enhanced loading animation with Lottie
+  const LoadingAnimation = useMemo(() => {
+    if (!loading) return null;
+    
+    return (
+      <div className="mt-4 flex flex-col items-center">
+        <div className="w-24 h-24">
+          <Lottie 
+            animationData={animationData} 
+            loop={true}
+            autoplay={true}
           />
         </div>
+        <p className="text-sm text-gray-600 mt-2">
+          {logs.length > 0 && logs[logs.length - 1].split('] ')[1]}
+        </p>
+        {processingTime && (
+          <p className="text-xs text-blue-600 mt-1">
+            Server processing: {processingTime}
+          </p>
+        )}
+      </div>
+    );
+  }, [loading, logs, processingTime]);
 
-        {/* Fetch CGPA */}
-        <div className="mt-4">
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={fetchCGPA}
+  // Main UI
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-100 to-purple-200 p-4">
+      <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
+        <h1 className="text-2xl font-bold mb-6 text-center text-gray-800">
+          🎓 CGPA Fetcher
+        </h1>
+        
+        {/* Semester Selection */}
+        <div className='mb-4'>
+        <FormControl fullWidth variant="outlined" className="mb-4">
+          <InputLabel>Select Semester</InputLabel>
+          <Select
+            value={semester}
+            onChange={handleSemesterChange}
+            label="Select Semester"
             disabled={loading}
-            fullWidth
           >
-            {loading ? (
-              <div className="flex items-center gap-2">
-                <CircularProgress size={20} color="inherit" />
-                <span>Fetching...</span>
-              </div>
-            ) : (
-              'Fetch CGPA'
-            )}
-          </Button>
+            {semesters.map(sem => (
+              <MenuItem key={sem.value} value={sem.value}>
+                {sem.label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
         </div>
+        {/* Roll Number Input */}
+        <div className='mb-4'>
+        <TextField
+          label="Enter Roll Number"
+          value={roll}
+          onChange={handleRollChange}
+          fullWidth
+          variant="outlined"
+          onKeyDown={handleKeyPress}
+          disabled={loading}
+          placeholder="e.g., 20XX1A0XXX"
+          helperText={roll && roll.length < 10 ? "Roll number should be 10 characters" : ""}
+          className="mb-4"
+        />
+        </div>
+        {/* Fetch Button */}
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={fetchCGPA}
+          disabled={loading || !roll.trim() || !semester}
+          fullWidth
+          size="large"
+          className="mb-4"
+        >
+          {loading ? (
+            <div className="flex items-center gap-2">
+              <CircularProgress size={20} color="inherit" />
+              <span>Fetching CGPA...</span>
+            </div>
+          ) : (
+            '🚀 Fetch CGPA'
+          )}
+        </Button>
 
-        {/* Debug Console */}
-        {logs.length > 0 && (
+          
+        {/* Debug Console - Improved */}
+        {import.meta.env.MODE !== 'production' && logs.length > 0 && (
           <div className="mt-4 border rounded-lg p-3 bg-gray-50">
-            <h3 className="font-semibold text-gray-700 mb-2">Debug Console</h3>
-            <div className="bg-black rounded p-2 max-h-40 overflow-y-auto font-mono text-xs">
+            <h3 className="font-semibold text-gray-700 mb-2 flex items-center gap-2">
+              📊 Debug Console
+              {processingTime && (
+                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                  {processingTime}
+                </span>
+              )}
+            </h3>
+            <div className="bg-black rounded p-3 max-h-48 overflow-y-auto font-mono text-xs">
               {logs.map((log, index) => (
-                <div key={index} className="text-green-400">
+                <div key={index} className="text-green-400 mb-1 leading-relaxed">
                   {log}
                 </div>
               ))}
+              {loading && (
+                <div className="text-yellow-400 animate-pulse">
+                  ⏳ Processing...
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* Show Student Name and CGPA */}
+        {/* Results Display */}
         {(studentName || cgpa) && (
-          <div className="mt-6 text-center space-y-2">
+          <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
             {studentName && (
-              <div className="text-lg font-semibold text-gray-800">
-                {studentName}
+              <div className="text-center text-lg font-semibold text-gray-800 mb-2">
+                👤 {studentName}
               </div>
             )}
             {cgpa && (
-              <div>
-                <span className="text-lg font-semibold"></span>
-                <span className="text-2xl font-bold text-green-600 animate-bounce">{cgpa}</span>
+              <div className="text-center">
+                <div className="text-sm text-gray-600 mb-1">CGPA</div>
+                <div className="text-3xl font-bold text-green-600 animate-bounce">
+                  {cgpa}
+                </div>
               </div>
             )}
           </div>
         )}
 
-        {/* Show Screenshots */}
+        {/* Screenshots - Enhanced */}
         {screenshots.length > 0 && (
           <div className="mt-4">
-            <h2 className="font-semibold mb-2">Screenshots:</h2>
-            <div className="flex flex-wrap gap-2">
+            <h2 className="font-semibold mb-3 flex items-center gap-2">
+              📸 Screenshots ({screenshots.length})
+            </h2>
+            <div className="grid grid-cols-2 gap-2">
               {screenshots.map(s => (
                 <div key={s.name} className="relative group">
                   <a
-                    href={`data:image/png;base64,${s.data}`}
-                    download={`${s.name}.png`}
-                    className="block border rounded shadow transition-transform"
+                    href={`data:image/jpeg;base64,${s.data}`}
+                    download={`${s.name}.jpg`}
+                    className="block border rounded-lg shadow hover:shadow-md transition-all duration-200 overflow-hidden"
                   >
                     <img 
-                      src={`data:image/png;base64,${s.data}`} 
+                      src={`data:image/jpeg;base64,${s.data}`} 
                       alt={s.name} 
-                      className="w-32 h-20 object-contain bg-white"
+                      className="w-full h-24 object-cover bg-white hover:scale-105 transition-transform duration-200"
+                      loading="lazy"
                     />
+                    <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-10 transition-all duration-200 flex items-center justify-center">
+                      <span className="text-white text-xs opacity-0 group-hover:opacity-100 bg-black bg-opacity-50 px-2 py-1 rounded">
+                        📥 Download
+                      </span>
+                    </div>
                   </a>
-                  {/* Hover Preview */}
-                  <div className="hidden group-hover:block absolute z-50 top-0 left-1/2 transform -translate-y-full -translate-x-1/2">
-                    <img
-                      src={`data:image/png;base64,${s.data}`}
-                      alt={`${s.name} preview`}
-                      className="w-[60rem] max-w-none border-4 border-white rounded-lg shadow-xl transition-transform duration-200 scale-50 bg-white"
-                    />
-                  </div>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* Show Error */}
+        {/* Error Snackbar */}
         <Snackbar 
           open={!!error} 
-          autoHideDuration={4000} 
+          autoHideDuration={6000} 
           onClose={() => setError('')}
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
         >
-          <Alert severity={error.includes('⚠️') ? 'warning' : 'error'} onClose={() => setError('')}>
+          <Alert 
+            severity={error.includes('⚠️') ? 'warning' : 'error'} 
+            onClose={() => setError('')}
+            variant="filled"
+          >
             {error}
           </Alert>
         </Snackbar>

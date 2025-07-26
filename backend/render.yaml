@@ -1,8 +1,0 @@
-services:
-  - type: web
-    name: cgpa-fetcher-backend
-    env: docker
-    rootDir: backend
-    dockerfilePath: backend/Dockerfile
-    plan: free
-    envVars: []
