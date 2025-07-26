@@ -76,7 +76,7 @@ function App() {
       
       // Add timeout to prevent hanging requests
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000); // 15 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 15 second timeout
       const res = await fetch(`${VITE_API_URL}/fetch-grade`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -136,6 +136,8 @@ function App() {
       }
       
       addLog(`🎉 Fetch completed successfully in ${clientTime}ms`);
+      // Print last fetch completed time in browser console (dev and prod)
+      console.log(`Fetch completed at: ${clientTime}`);
       
     } catch (e) {
       const clientTime = Date.now() - startTime;
