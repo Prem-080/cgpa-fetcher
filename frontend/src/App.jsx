@@ -4,7 +4,9 @@ import Lottie from 'lottie-react';
 import animationData from './fetching.json';
 import API_URL from './config';
 
+// Main App
 function App() {
+  // State Variables
   const [roll, setRoll] = useState('');
   const [loading, setLoading] = useState(false);
   const [cgpa, setCgpa] = useState('');
@@ -14,6 +16,7 @@ function App() {
   const [logs, setLogs] = useState([]);
   const [semester, setSemester] = useState('');
 
+  // Semester Options
   const semesters = [
     { value: 'I_I', label: 'I Year I Semester' },
     { value: 'I_II', label: 'I Year II Semester' },
@@ -25,14 +28,17 @@ function App() {
     { value: 'IV_II', label: 'IV Year II Semester' }
   ];
 
+  // Sleep Function
   const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+  // Add Log Function to console
   const addLog = async (message) => {
     const timestamp = new Date().toLocaleTimeString();
     setLogs(prev => [...prev, `[${timestamp}] ${message}`]);
     await sleep(500);
   };
 
+  // Fetch CGPA Function
   const fetchCGPA = async () => {
     if (!roll.trim()) {
       setError('Please enter a roll number');
@@ -43,7 +49,7 @@ function App() {
       setError('Please select a semester');
       return;
     }
-
+    // Reset all states
     setLogs([]);
     setLoading(true);
     setCgpa('');
@@ -98,24 +104,13 @@ function App() {
       setLoading(false);
     }
   };
-
+  // Main UI
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-100 to-purple-200">
       <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md">
         <h1 className="text-2xl font-bold mb-4">CGPA Fetcher</h1>
-        
-        <div className="space-y-4">
-          <TextField
-            label="Enter Roll Number"
-            value={roll}
-            onChange={e => setRoll(e.target.value)}
-            fullWidth
-            variant="outlined"
-            onKeyDown={e => e.key === 'Enter' && !loading && fetchCGPA()}
-            disabled={loading}
-          />
-
-          <FormControl fullWidth variant="outlined">
+        {/* Enter Semester */}
+        <FormControl fullWidth variant="outlined">
             <InputLabel>Select Semester</InputLabel>
             <Select
               value={semester}
@@ -130,6 +125,20 @@ function App() {
               ))}
             </Select>
           </FormControl>
+
+        {/* Enter Roll Number */}
+        <div className="space-y-4">
+          <TextField
+            label="Enter Roll Number"
+            value={roll}
+            onChange={e => setRoll(e.target.value)}
+            fullWidth
+            variant="outlined"
+            onKeyDown={e => e.key === 'Enter' && !loading && fetchCGPA()}
+            disabled={loading}
+          />
+
+        {/* Fetch CGPA */}
 
           <Button
             variant="contained"
@@ -163,6 +172,7 @@ function App() {
           </div>
         )}
 
+        {/* Show Student Name and CGPA */}
         {(studentName || cgpa) && (
           <div className="mt-6 text-center space-y-2">
             {studentName && (
@@ -179,6 +189,7 @@ function App() {
           </div>
         )}
 
+        {/* Show Screenshots */}
         {screenshots.length > 0 && (
           <div className="mt-4">
             <h2 className="font-semibold mb-2">Screenshots:</h2>
@@ -201,7 +212,7 @@ function App() {
                     <img
                       src={`data:image/png;base64,${s.data}`}
                       alt={`${s.name} preview`}
-                      className="w-[60rem] max-w-none border-4 border-white rounded-lg shadow-xl transition-transform duration-200 scale-y-50 scale-x-100 bg-white"
+                      className="w-[60rem] max-w-none border-4 border-white rounded-lg shadow-xl transition-transform duration-200 scale-50 bg-white"
                     />
                   </div>
                 </div>
@@ -210,6 +221,7 @@ function App() {
           </div>
         )}
 
+        {/* Show Error */}
         <Snackbar 
           open={!!error} 
           autoHideDuration={4000} 

@@ -324,7 +324,7 @@ app.post('/fetch-grade', async (req, res) => {
                 name: `${roll}_${semester}_cgpa`,
                 data: await page.screenshot({
                     encoding: 'base64',
-                    fullPage: false,
+                    fullPage: true,
                     type: 'png',
                     omitBackground: false
                 })
