@@ -134,7 +134,7 @@ app.post('/fetch-grade', async (req, res) => {
                 '--disable-sync',
                 '--aggressive-cache-discard'
             ],
-            defaultViewport: { width: 1200, height: 900 }, // Smaller for speed
+            defaultViewport: { width: 1024, height: 720 }, // Smaller for speed
             timeout: 8000
         });
 
@@ -168,6 +168,7 @@ app.post('/fetch-grade', async (req, res) => {
         });
 
         await waitForPageReady(page, 2000);
+        await delay(100);
         debug('📄 Login page loaded');
 
         // Step 1: Click Logins
@@ -233,7 +234,7 @@ app.post('/fetch-grade', async (req, res) => {
         }
 
         await waitForPageReady(page, 1500);
-
+        await await page.waitForSelector('a', { visible: true, timeout: 2000 });
         debug('📈 Clicking Overall Marks - Semwise...');
         const overallSuccess = await stableClick(page, 'Overall Marks - Semwise');
         if (!overallSuccess) {
