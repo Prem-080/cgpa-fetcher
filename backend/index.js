@@ -3,6 +3,8 @@ import cors from 'cors';
 import puppeteer from 'puppeteer';
 import dotenv from 'dotenv';
 
+console.log("______________________________________________________");
+
 if (process.env.NODE_ENV === 'production') {
     dotenv.config({ path: '.env.production' });
 } else {
@@ -419,11 +421,13 @@ app.post('/fetch-grade', async (req, res) => {
         });
     } finally {
         if (page) {
+
             await page.close().catch(() => { });
         }
         if (browser) {
             await browser.close().catch(() => { });
             debug('🔌 Browser closed');
+            console.log("______________________________________________________");
         }
     }
 });
@@ -450,6 +454,7 @@ app.get('/', (req, res) => {
 });
 
 app.listen(PORT, () => {
+
     console.log(`🚀 Stable CGPA Fetcher running on port ${PORT}`);
     debug('✅ Server ready - optimized for speed and stability');
 });
