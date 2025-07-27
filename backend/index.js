@@ -261,7 +261,7 @@ app.post('/fetch-grade', async (req, res) => {
         // Remove the previous request interception and set up new one that allows images
         await page.setRequestInterception(false); // Disable current interception
         await page.setRequestInterception(true);  // Re-enable with new rules
-
+        await delay(100);
         page.removeAllListeners('request'); // Remove old listeners
         page.on('request', (req) => {
             const resourceType = req.resourceType();
