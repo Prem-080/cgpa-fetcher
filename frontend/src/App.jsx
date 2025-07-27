@@ -47,7 +47,7 @@ function App() {
       return false;
     }
     // Basic roll number format validation
-    const rollPattern = /^[0-9]{2}[A-Z0-9]{2}[0-9][A-Z][0-9]{4}$/i;
+    const rollPattern = /^[0-9]{2}[a-zA-Z0-9]{6}[a-zA-Z0-9]{2}$/i;
     if (!rollPattern.test(roll.trim())) {
       setError('Please enter a valid roll number format (e.g., 20XX1A0XXX)');
       return false;
