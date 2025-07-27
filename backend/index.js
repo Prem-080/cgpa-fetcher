@@ -134,7 +134,7 @@ app.post('/fetch-grade', async (req, res) => {
                 '--disable-sync',
                 '--aggressive-cache-discard'
             ],
-            defaultViewport: { width: 1024, height: 768 }, // Smaller for speed
+            defaultViewport: { width: 1200, height: 900 }, // Smaller for speed
             timeout: 8000
         });
 
