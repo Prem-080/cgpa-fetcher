@@ -41,6 +41,21 @@ const debug = (msg) => {
     console.error(`[DEBUG] ${msg}`); // Backup for visibility
 };
 
+const sessionStore = new Map(); // Key: roll number, Value: { browser, page, lastUsed, cgpa, studentName, screenshots, semester }
+
+setInterval(() => {
+    for (const [roll, session] of sessionStore.entries()) {
+        const age = Date.now() - session.lastUsed;
+        if (age > 10 * 60 * 1000) { // 10 minutes
+            session.page?.close().catch(() => { });
+            session.browser?.close().catch(() => { });
+            sessionStore.delete(roll);
+            debug(`🧹 Cleaned up idle session for ${roll}`);
+        }
+    }
+}, 5 * 60 * 1000); // Run every 5 min
+
+
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Stable click helper with multiple strategies
@@ -109,116 +124,164 @@ app.post('/fetch-grade', async (req, res) => {
     if (!roll) return res.status(400).json({ error: 'Roll number required' });
     if (!semester) return res.status(400).json({ error: 'Semester selection required' });
 
+    // Check if we have a cached session for this roll and semester
+    const existingSession = sessionStore.get(roll);
+
+
+    // IMPORTANT: Always take fresh screenshots to avoid showing stale data
+    // We only cache browser sessions for performance, not screenshots
+    const needsNewScreenshot = true; // Always take fresh screenshots
+
+    debug(`📊 Screenshot needed: ${needsNewScreenshot} (always taking fresh screenshots)`);
+
+
+
     let browser;
     let page;
     let screenshots = [];
     let cgpa = '-';
     let studentName = '';
 
+
     try {
         debug(`🚀 Starting optimized fetch for ${roll}, semester: ${semester}`);
 
-        // Launch browser with optimized settings
-        browser = await puppeteer.launch({
-            headless: "new",
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-gpu',
-                '--disable-dev-shm-usage',
-                '--disable-features=IsolateOrigins,site-per-process',
-                '--disable-web-security',
-                '--disable-extensions',
-                '--no-first-run',
-                '--disable-default-apps',
-                '--disable-sync',
-                '--aggressive-cache-discard'
-            ],
-            defaultViewport: { width: 1024, height: 720 }, // Smaller for speed
-            timeout: 8000
-        });
+        // Check if we have an existing session for this roll number
+        if (existingSession && existingSession.browser && existingSession.page) {
+            debug(`♻️ Reusing browser session for ${roll}`);
+            browser = existingSession.browser;
+            page = existingSession.page;
+            // Update last used time
+            existingSession.lastUsed = Date.now();
 
-        page = await browser.newPage();
+        } else {
+            // Create new browser session
+            browser = await puppeteer.launch({
+                headless: "new",
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-gpu',
+                    '--disable-dev-shm-usage',
+                    '--disable-features=IsolateOrigins,site-per-process',
+                    '--disable-web-security',
+                    '--disable-extensions',
+                    '--no-first-run',
+                    '--disable-default-apps',
+                    '--disable-sync',
+                    '--aggressive-cache-discard'
+                ],
+                defaultViewport: { width: 1024, height: 720 }, // Smaller for speed
+                timeout: 8000
+            });
 
-        // Optimize page settings
-        await page.setExtraHTTPHeaders({
-            'Accept-Language': 'en-US,en;q=0.9'
-        });
+            page = await browser.newPage();
 
-        // Enhanced request interception
-        await page.setRequestInterception(true);
-        page.on('request', (req) => {
-            const resourceType = req.resourceType();
-            const url = req.url();
+            // Optimize page settings
+            await page.setExtraHTTPHeaders({
+                'Accept-Language': 'en-US,en;q=0.9'
+            });
 
-            // Block unnecessary resources more aggressively
-            if (['image', 'stylesheet', 'font', 'media', 'websocket'].includes(resourceType)) {
-                req.abort();
-            } else if (resourceType === 'script' && !url.includes('tkrcetautonomous')) {
-                req.abort(); // Block external scripts
-            } else {
-                req.continue();
+            // Enhanced request interception
+            await page.setRequestInterception(true);
+            page.on('request', (req) => {
+                const resourceType = req.resourceType();
+                const url = req.url();
+
+                // Block unnecessary resources more aggressively
+                if (['image', 'stylesheet', 'font', 'media', 'websocket'].includes(resourceType)) {
+                    req.abort();
+                } else if (resourceType === 'script' && !url.includes('tkrcetautonomous')) {
+                    req.abort(); // Block external scripts
+                } else {
+                    req.continue();
+                }
+            });
+
+
+
+            if (sessionStore.size == 2) {
+                sessionStore.delete(sessionStore.keys().next().value); // Remove oldest session if we have 2
+                debug('🧹 Removed oldest session to limit memory usage');
             }
-        });
 
-        debug('📡 Navigating to login page...');
-        await page.goto('https://www.tkrcetautonomous.org/Login.aspx', {
-            waitUntil: 'domcontentloaded',
-            timeout: 10000
-        });
-
-        await waitForPageReady(page, 2000);
-        await delay(100);
-        debug('📄 Login page loaded');
-
-        // Step 1: Click Logins
-        debug('🔗 Clicking Logins...');
-        const loginsSuccess = await stableClick(page, 'Logins');
-        if (!loginsSuccess) {
-            throw new Error('Could not find or click Logins button');
+            // Store the new session
+            sessionStore.set(roll, {
+                browser,
+                page,
+                lastUsed: Date.now(),
+                cgpa: null,
+                studentName: null,
+                screenshots: [],
+                semester: null
+            });
         }
 
-        await waitForPageReady(page, 1500);
+        // Check if we need to login (only if no existing session or different semester)
+        const currentUrl = await page.url();
+        if (!currentUrl.includes('tkrcetautonomous.org') || currentUrl.includes('Login.aspx')) {
+            debug('📡 Navigating to login page...');
+            await page.goto('https://www.tkrcetautonomous.org/Login.aspx', {
+                waitUntil: 'domcontentloaded',
+                timeout: 10000
+            });
 
-        // Step 2: Click Student Login
-        debug('🎓 Clicking Student Login...');
-        const studentLoginSuccess = await stableClick(page, 'Student Login');
-        if (!studentLoginSuccess) {
-            throw new Error('Could not find or click Student Login button');
+            await waitForPageReady(page, 2000);
+            await delay(100);
+            debug('📄 Login page loaded');
+
+            // Step 1: Click Logins
+            debug('🔗 Clicking Logins...');
+            const loginsSuccess = await stableClick(page, 'Logins');
+            if (!loginsSuccess) {
+                throw new Error('Could not find or click Logins button');
+            }
+
+            await waitForPageReady(page, 1500);
+
+            // Step 2: Click Student Login
+            debug('🎓 Clicking Student Login...');
+            const studentLoginSuccess = await stableClick(page, 'Student Login');
+            if (!studentLoginSuccess) {
+                throw new Error('Could not find or click Student Login button');
+            }
+
+            await waitForPageReady(page, 2000);
+
+            // Step 3: Login
+            debug('🔐 Logging in...');
+            try {
+                await page.waitForSelector('#txtUserId', { visible: true, timeout: 4000 });
+
+                // Clear and type credentials
+                await page.click('#txtUserId', { clickCount: 3 }); // Select all
+                await page.type('#txtUserId', roll, { delay: 20 });
+
+                await page.click('#txtPwd', { clickCount: 3 }); // Select all
+                await page.type('#txtPwd', roll, { delay: 20 });
+
+                debug('🔑 Submitting login...');
+
+                // Submit and wait for navigation
+                await Promise.all([
+                    page.waitForNavigation({
+                        waitUntil: 'domcontentloaded',
+                        timeout: 6000
+                    }).catch(() => debug('⚠️ Navigation timeout, continuing...')),
+                    page.click('#btnLogin')
+                ]);
+
+            } catch (error) {
+                debug(`❌ Login error: ${error.message}`);
+                throw new Error('Login failed - check roll number or website issues');
+            }
+
+            await waitForPageReady(page, 2000);
+            debug('✅ Login successful');
+        } else {
+            debug('✅ Already logged in, skipping login process');
         }
 
-        await waitForPageReady(page, 2000);
-
-        // Step 3: Login
-        debug('🔐 Logging in...');
-        try {
-            await page.waitForSelector('#txtUserId', { visible: true, timeout: 4000 });
-
-            // Clear and type credentials
-            await page.click('#txtUserId', { clickCount: 3 }); // Select all
-            await page.type('#txtUserId', roll, { delay: 20 });
-
-            await page.click('#txtPwd', { clickCount: 3 }); // Select all
-            await page.type('#txtPwd', roll, { delay: 20 });
-
-            debug('🔑 Submitting login...');
-
-            // Submit and wait for navigation
-            await Promise.all([
-                page.waitForNavigation({
-                    waitUntil: 'domcontentloaded',
-                    timeout: 6000
-                }).catch(() => debug('⚠️ Navigation timeout, continuing...')),
-                page.click('#btnLogin')
-            ]);
-
-        } catch (error) {
-            debug(`❌ Login error: ${error.message}`);
-            throw new Error('Login failed - check roll number or website issues');
-        }
-
-        await waitForPageReady(page, 2000);
-        debug('✅ Login successful');
 
         // Extract student name (async, don't wait)
         const namePromise = page.evaluate(() => {
@@ -226,58 +289,68 @@ app.post('/fetch-grade', async (req, res) => {
             return nameEl ? nameEl.innerText.trim() : '';
         }).catch(() => '');
 
-        // Step 4: Navigate to Marks
-        debug('📊 Navigating to Marks Details...');
-        const marksSuccess = await stableClick(page, 'Marks Details');
-        if (!marksSuccess) {
-            throw new Error('Could not find Marks Details');
+        // Get student name (wait for promise to complete)
+        studentName = await namePromise;
+        if (studentName) {
+            debug(`👤 Student name: ${studentName}`);
         }
 
-        await waitForPageReady(page, 1500);
-        await await page.waitForSelector('a', { visible: true, timeout: 2000 });
-        debug('📈 Clicking Overall Marks - Semwise...');
-        const overallSuccess = await stableClick(page, 'Overall Marks - Semwise');
-        if (!overallSuccess) {
-            throw new Error('Could not find Overall Marks - Semwise');
-        }
-
-        // Wait for marks page with flexible timeout
-        try {
-            await page.waitForNavigation({
-                waitUntil: 'domcontentloaded',
-                timeout: 5000
-            });
-        } catch (navError) {
-            debug('⚠️ Marks navigation timeout, checking if page loaded...');
-            await waitForPageReady(page, 1000);
-        }
-
-        debug('📊 Marks page loaded');
-
-        // Step 5: Select Semester and Extract CGPA
-        // ENABLE IMAGES BEFORE SCREENSHOT
-        debug('🖼️ Enabling images and stylesheet for screenshot...');
-
-        // Remove the previous request interception and set up new one that allows images
-        await page.setRequestInterception(false); // Disable current interception
-        await page.setRequestInterception(true);  // Re-enable with new rules
-        await delay(100);
-        page.removeAllListeners('request'); // Remove old listeners
-        page.on('request', (req) => {
-            const resourceType = req.resourceType();
-            const url = req.url();
-
-            // Now ALLOW images but still block other unnecessary resources
-            if (['font', 'media', 'websocket'].includes(resourceType)) {
-                req.abort();
-            } else if (resourceType === 'script' && !url.includes('tkrcetautonomous')) {
-                req.abort(); // Block external scripts
-            } else {
-                req.continue(); // Allow images, documents, xhr, and site scripts
+        if (!existingSession) {
+            // Step 4: Navigate to Marks
+            debug('📊 Navigating to Marks Details...');
+            const marksSuccess = await stableClick(page, 'Marks Details');
+            if (!marksSuccess) {
+                throw new Error('Could not find Marks Details');
             }
-        });
 
-        // Step 5: Select Semester and Extract CGPA
+            await waitForPageReady(page, 1500);
+            await await page.waitForSelector('a', { visible: true, timeout: 2000 });
+            debug('📈 Clicking Overall Marks - Semwise...');
+            const overallSuccess = await stableClick(page, 'Overall Marks - Semwise');
+            if (!overallSuccess) {
+                throw new Error('Could not find Overall Marks - Semwise');
+            }
+
+            // Wait for marks page with flexible timeout
+            try {
+                await page.waitForNavigation({
+                    waitUntil: 'domcontentloaded',
+                    timeout: 5000
+                });
+            } catch (navError) {
+                debug('⚠️ Marks navigation timeout, checking if page loaded...');
+                await waitForPageReady(page, 1000);
+            }
+
+            debug('📊 Marks page loaded');
+        }
+
+
+        if (!existingSession) {
+            debug('🖼️ Enabling images and stylesheet for screenshot...');
+
+            // Remove the previous request interception and set up new one that allows images
+
+            await page.setRequestInterception(false); // Disable current interception
+            await page.setRequestInterception(true);  // Re-enable with new rules
+            await delay(100);
+            page.removeAllListeners('request'); // Remove old listeners
+            page.on('request', (req) => {
+                const resourceType = req.resourceType();
+                const url = req.url();
+
+                // Now ALLOW images but still block other unnecessary resources
+                if (['font', 'media', 'websocket'].includes(resourceType)) {
+                    req.abort();
+                } else if (resourceType === 'script' && !url.includes('tkrcetautonomous')) {
+                    req.abort(); // Block external scripts
+                } else {
+                    req.continue(); // Allow images, documents, xhr, and site scripts
+                }
+            });
+        }
+
+        // Step 5: Select Semester and Extract CGPA (WITHOUT enabling images first)
         debug('🎯 Selecting semester and extracting CGPA...');
 
         const semesterMap = {
@@ -295,9 +368,10 @@ app.post('/fetch-grade', async (req, res) => {
             throw new Error('Invalid semester selection');
         }
 
-        // Enhanced semester selection with CGPA extraction
+
+        // Enhanced semester selection with proper CGPA extraction
         const result = await page.evaluate(async (semText) => {
-            // Find and click semester button
+            // Find semester button
             const inputs = Array.from(document.querySelectorAll('input[type="submit"]'));
             const semButton = inputs.find(input =>
                 input.value && input.value.includes(semText)
@@ -306,10 +380,8 @@ app.post('/fetch-grade', async (req, res) => {
             if (!semButton) {
                 return { success: false, error: `Semester ${semText} not found` };
             }
-
-            const cgpaElement = document.getElementById('cpStudCorner_lblFinalCGPA');
-            const cgpaValue = cgpaElement ? cgpaElement.innerText.trim() : '-';
-
+            const cgpaButton = document.getElementById('cpStudCorner_lblFinalCGPA');
+            let cgpaValue = cgpaButton ? cgpaButton.innerText.trim() : '-';
             // Click semester button
             semButton.click();
 
@@ -317,77 +389,87 @@ app.post('/fetch-grade', async (req, res) => {
                 success: true,
                 semesterClicked: true,
                 cgpa: cgpaValue
+
             };
         }, semesterText);
 
         if (!result.success) {
-            return res.json({ error: `Results for ${semesterText} are not available` }).status(400);
-
+            return res.status(400).json({ error: `Results for ${semesterText} are not available` });
         }
 
         // Wait for page to update after semester selection
-        await delay(500);
+        await delay(500); // Wait longer for page update
 
-        // Extract CGPA
+
         cgpa = result.cgpa;
-
-        if (!cgpa || cgpa === '-') {
-            throw new Error('CGPA not found on page');
+        if (cgpa) {
+            debug(`💯 CGPA extracted: ${cgpa}`);
+        }
+        else {
+            debug('❌ CGPA not found, returning default value');
+            cgpa = '-';
         }
 
-        debug(`💯 CGPA extracted: ${cgpa}`);
+        console.log("screenshot will most likeyly be destroyed!!");
 
-        // Get student name (wait for promise to complete)
-        studentName = await namePromise;
-        if (studentName) {
-            debug(`👤 Student name: ${studentName}`);
-        }
+        // Wait for images to load and take screenshot (only if we need new screenshots)
+        let screenshotSuccess = false;
+        if (needsNewScreenshot) {
+            try {
+                if (!existingSession) {
 
-        // Wait for images to load and take screenshot
-        debug('📸 Waiting for images to load and taking full screenshot...');
-        try {
-            // Wait for all images to load with timeout protection
-            await Promise.race([
-                page.evaluate(() => {
-                    const images = Array.from(document.images);
-                    const incompleteImages = images.filter(img => !img.complete);
+                    console.log("Waiting for images to load and taking full screenshot...");
 
-                    const stylesheets = Array.from(document.styleSheets);
-                    const incompleteStylesheets = stylesheets.filter(stylesheet => !stylesheet.cssRules);
+                    await Promise.race([
+                        page.evaluate(() => {
+                            const images = Array.from(document.images);
+                            const incompleteImages = images.filter(img => !img.complete);
 
-                    if (incompleteStylesheets.length === 0) {
-                        return Promise.resolve(); // All stylesheets already loaded
-                    }
+                            const stylesheets = Array.from(document.styleSheets);
+                            const incompleteStylesheets = stylesheets.filter(stylesheet => !stylesheet.cssRules);
 
-
-                    if (incompleteImages.length === 0) {
-                        return Promise.resolve(); // All images already loaded
-                    }
-
-                    return Promise.all(
-                        incompleteImages.map(img => new Promise(resolve => {
-                            if (img.complete) {
-                                resolve();
-                            } else {
-                                img.onload = resolve;
-                                img.onerror = resolve; // Continue even if image fails
+                            if (incompleteStylesheets.length === 0) {
+                                return Promise.resolve(); // All stylesheets already loaded
                             }
-                        }))
-                    );
-                }),
-                delay(1000) // Maximum 1 second wait for images
-            ]);
+                            if (incompleteImages.length === 0) {
+                                return Promise.resolve(); // All images already loaded
+                            }
 
-            // Small delay for rendering
-            await delay(500);
+                            return Promise.all(
+                                incompleteImages.map(img => new Promise(resolve => {
 
-            // Take full screenshot without clipping
+                                    if (img.complete) {
+                                        resolve();
+                                    } else {
+                                        img.onload = resolve;
+                                        img.onerror = resolve; // Continue even if image fails
+                                    }
+                                }))
+                            );
+                        }),
+                        delay(1000) // Maximum 1 second wait for images
+                    ]);
+
+                    await delay(500);
+                    // Small delay for rendering
+
+                }
+
+                screenshotSuccess = true;
+
+            } catch (screenshotError) {
+                debug(`⚠️ Screenshot failed: ${screenshotError.message}`);
+                screenshotSuccess = false;
+            }
+        }
+
+        if (screenshotSuccess) {
+            debug('📸 Taking full screenshot...');
             const screenshotData = await page.screenshot({
                 encoding: 'base64',
                 type: 'jpeg',
-                quality: 80, // Slightly higher quality since we're including images
-                fullPage: true, // Full viewport capture
-
+                quality: 80,
+                fullPage: true,
             });
 
             screenshots.push({
@@ -396,10 +478,17 @@ app.post('/fetch-grade', async (req, res) => {
             });
 
             debug('📸 Screenshot with images captured successfully');
+        }
 
-        } catch (screenshotError) {
-            debug(`⚠️ Screenshot failed: ${screenshotError.message}`);
-            // Continue without screenshot
+        // Update session store with new data
+        const session = sessionStore.get(roll);
+        if (session) {
+            session.cgpa = cgpa;
+            session.studentName = studentName;
+            session.semester = semester;
+            session.lastUsed = Date.now();
+            session.screenshots = screenshots;
+            debug('✅ Session updated with data');
         }
 
         const totalTime = Date.now() - startTime;
@@ -409,7 +498,8 @@ app.post('/fetch-grade', async (req, res) => {
             cgpa,
             screenshots,
             studentName,
-            processingTime: `${totalTime}ms`
+            processingTime: `${totalTime}ms`,
+            cached: false // Always false since we take fresh screenshots
         });
 
     } catch (error) {
@@ -420,17 +510,8 @@ app.post('/fetch-grade', async (req, res) => {
             error: error.message,
             processingTime: `${totalTime}ms`
         });
-    } finally {
-        if (page) {
-
-            await page.close().catch(() => { });
-        }
-        if (browser) {
-            await browser.close().catch(() => { });
-            debug('🔌 Browser closed');
-            console.log("______________________________________________________");
-        }
     }
+    // Note: We don't close browser/page here anymore as we're reusing them
 });
 
 // Health check endpoint
