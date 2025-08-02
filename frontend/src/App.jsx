@@ -11,6 +11,7 @@ function App() {
   const [roll, setRoll] = useState('');
   const [loading, setLoading] = useState(false);
   const [cgpa, setCgpa] = useState('');
+  const [sgpa, setSgpa] = useState('');
   const [studentName, setStudentName] = useState('');
   const [screenshots, setScreenshots] = useState([]);
   const [error, setError] = useState('');
@@ -63,6 +64,7 @@ function App() {
     setLogs([]);
     setLoading(true);
     setCgpa('');
+    setSgpa('');
     setStudentName('');
     setScreenshots([]);
     setError('');
@@ -128,6 +130,11 @@ function App() {
       if (data.cgpa) {
         addLog(`🎯 CGPA: ${data.cgpa}`);
         setCgpa(data.cgpa);
+      }
+      
+      if (data.sgpaValue) {
+        addLog(`📊 SGPA: ${data.sgpaValue}`);
+        setSgpa(data.sgpaValue);
       }
       
       if (data.screenshots && data.screenshots.length > 0) {
@@ -307,6 +314,14 @@ function App() {
                 <div className="text-sm text-gray-600 mb-1">CGPA</div>
                 <div className="text-3xl font-bold text-green-600 animate-bounce">
                   {cgpa}
+                </div>
+              </div>
+            )}
+            {sgpa && (
+              <div className="text-center">
+                <div className="text-sm text-gray-600 mb-1">SGPA</div>
+                <div className="text-3xl font-bold text-green-600 animate-bounce">
+                  {sgpa}
                 </div>
               </div>
             )}

@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import puppeteer from 'puppeteer';
+import sgpa from './sgpa_calculator.js'
 import dotenv from 'dotenv';
 
 console.log("______________________________________________________");
@@ -116,6 +117,17 @@ const waitForPageReady = async (page, timeout = 3000) => {
     }
 };
 
+// Helper function to check if page is still valid
+const isPageValid = async (page) => {
+    try {
+        await page.evaluate(() => document.title);
+        return true;
+    } catch (error) {
+        debug(`⚠️ Page validation failed: ${error.message}`);
+        return false;
+    }
+};
+
 app.post('/fetch-grade', async (req, res) => {
     const startTime = Date.now();
     const roll = req.body.roll?.toUpperCase();
@@ -126,14 +138,25 @@ app.post('/fetch-grade', async (req, res) => {
 
     // Check if we have a cached session for this roll and semester
     const existingSession = sessionStore.get(roll);
+    if (existingSession && existingSession.semester === semester && existingSession.screenshots.length > 0) {
+        debug(`🔄 Reusing existing session for ${roll}, semester: ${semester}`);
+        existingSession.lastUsed = Date.now();
 
+        return res.json({
+            cgpa: existingSession.cgpa,
+            screenshots: existingSession.screenshots,
+            studentName: existingSession.studentName,
+            processingTime: '0ms (cached)',
+            cached: true
+        });
+    }
 
-    // IMPORTANT: Always take fresh screenshots to avoid showing stale data
-    // We only cache browser sessions for performance, not screenshots
-    const needsNewScreenshot = true; // Always take fresh screenshots
+    // Determine if we need to take a new screenshot
+    const needsNewScreenshot = !existingSession ||
+        existingSession.screenshots.length === 0 ||
+        existingSession.semester !== semester;
 
-    debug(`📊 Screenshot needed: ${needsNewScreenshot} (always taking fresh screenshots)`);
-
+    debug(`📊 Screenshot needed: ${needsNewScreenshot} (existing: ${!!existingSession}, screenshots: ${existingSession?.screenshots?.length || 0}, semester match: ${existingSession?.semester === semester})`);
 
 
     let browser;
@@ -148,14 +171,33 @@ app.post('/fetch-grade', async (req, res) => {
 
         // Check if we have an existing session for this roll number
         if (existingSession && existingSession.browser && existingSession.page) {
-            debug(`♻️ Reusing browser session for ${roll}`);
-            browser = existingSession.browser;
-            page = existingSession.page;
-            // Update last used time
-            existingSession.lastUsed = Date.now();
+            debug(`♻️ Checking existing browser session for ${roll}`);
 
-        } else {
-            // Create new browser session
+            // Validate if the existing page is still usable
+            const pageValid = await isPageValid(existingSession.page);
+
+            if (pageValid) {
+                debug(`✅ Reusing valid browser session for ${roll}`);
+                browser = existingSession.browser;
+                page = existingSession.page;
+                existingSession.lastUsed = Date.now();
+            } else {
+                debug(`❌ Existing page is invalid, creating new session`);
+                // Clean up invalid session
+                try {
+                    await existingSession.page?.close();
+                    await existingSession.browser?.close();
+                } catch (e) {
+                    debug(`⚠️ Error cleaning up invalid session: ${e.message}`);
+                }
+                sessionStore.delete(roll);
+                // Will create new session below
+            }
+        }
+
+        // Create new browser session if needed
+        if (!browser || !page) {
+            debug(`🆕 Creating new browser session for ${roll}`);
             browser = await puppeteer.launch({
                 headless: "new",
                 args: [
@@ -197,13 +239,6 @@ app.post('/fetch-grade', async (req, res) => {
                     req.continue();
                 }
             });
-
-
-
-            if (sessionStore.size == 2) {
-                sessionStore.delete(sessionStore.keys().next().value); // Remove oldest session if we have 2
-                debug('🧹 Removed oldest session to limit memory usage');
-            }
 
             // Store the new session
             sessionStore.set(roll, {
@@ -295,7 +330,11 @@ app.post('/fetch-grade', async (req, res) => {
             debug(`👤 Student name: ${studentName}`);
         }
 
-        if (!existingSession) {
+        // Check if we're already on the marks page
+        const currentPageUrl = await page.url();
+        const needsNavigation = !currentPageUrl.includes('MarksDetailsSem') && !currentPageUrl.includes('Overall');
+
+        if (needsNavigation) {
             // Step 4: Navigate to Marks
             debug('📊 Navigating to Marks Details...');
             const marksSuccess = await stableClick(page, 'Marks Details');
@@ -304,7 +343,7 @@ app.post('/fetch-grade', async (req, res) => {
             }
 
             await waitForPageReady(page, 1500);
-            await await page.waitForSelector('a', { visible: true, timeout: 2000 });
+            await page.waitForSelector('a', { visible: true, timeout: 2000 });
             debug('📈 Clicking Overall Marks - Semwise...');
             const overallSuccess = await stableClick(page, 'Overall Marks - Semwise');
             if (!overallSuccess) {
@@ -323,34 +362,11 @@ app.post('/fetch-grade', async (req, res) => {
             }
 
             debug('📊 Marks page loaded');
+        } else {
+            debug('📊 Already on marks page, skipping navigation');
         }
 
-
-        if (!existingSession) {
-            debug('🖼️ Enabling images and stylesheet for screenshot...');
-
-            // Remove the previous request interception and set up new one that allows images
-
-            await page.setRequestInterception(false); // Disable current interception
-            await page.setRequestInterception(true);  // Re-enable with new rules
-            await delay(100);
-            page.removeAllListeners('request'); // Remove old listeners
-            page.on('request', (req) => {
-                const resourceType = req.resourceType();
-                const url = req.url();
-
-                // Now ALLOW images but still block other unnecessary resources
-                if (['font', 'media', 'websocket'].includes(resourceType)) {
-                    req.abort();
-                } else if (resourceType === 'script' && !url.includes('tkrcetautonomous')) {
-                    req.abort(); // Block external scripts
-                } else {
-                    req.continue(); // Allow images, documents, xhr, and site scripts
-                }
-            });
-        }
-
-        // Step 5: Select Semester and Extract CGPA (WITHOUT enabling images first)
+        // Step 5: Select Semester and Extract CGPA
         debug('🎯 Selecting semester and extracting CGPA...');
 
         const semesterMap = {
@@ -368,9 +384,8 @@ app.post('/fetch-grade', async (req, res) => {
             throw new Error('Invalid semester selection');
         }
 
-
-        // Enhanced semester selection with proper CGPA extraction
-        const result = await page.evaluate(async (semText) => {
+        // Enhanced semester selection with CGPA extraction - BEFORE clicking
+        const preClickResult = await page.evaluate((semText) => {
             // Find semester button
             const inputs = Array.from(document.querySelectorAll('input[type="submit"]'));
             const semButton = inputs.find(input =>
@@ -380,64 +395,126 @@ app.post('/fetch-grade', async (req, res) => {
             if (!semButton) {
                 return { success: false, error: `Semester ${semText} not found` };
             }
-            const cgpaButton = document.getElementById('cpStudCorner_lblFinalCGPA');
-            let cgpaValue = cgpaButton ? cgpaButton.innerText.trim() : '-';
-            // Click semester button
-            semButton.click();
+
+            // Extract CGPA BEFORE clicking
+            const cgpaElement = document.getElementById('cpStudCorner_lblFinalCGPA');
+            const cgpaValue = cgpaElement ? cgpaElement.innerText.trim() : '-';
 
             return {
                 success: true,
-                semesterClicked: true,
-                cgpa: cgpaValue
-
+                cgpa: cgpaValue,
+                buttonFound: true
             };
         }, semesterText);
 
-        if (!result.success) {
+        if (!preClickResult.success) {
             return res.status(400).json({ error: `Results for ${semesterText} are not available` });
         }
 
-        // Wait for page to update after semester selection
-        await delay(500); // Wait longer for page update
+        // NOW enable images AFTER semester validation (only if we need screenshots)
+        if (!existingSession) {
+            debug('🖼️ Enabling images and stylesheets for screenshot...');
 
+            // Remove the previous request interception and set up new one that allows images
+            await page.setRequestInterception(false); // Disable current interception
+            await delay(100);
+            await page.setRequestInterception(true);  // Re-enable with new rules
+            page.removeAllListeners('request'); // Remove old listeners
+            page.on('request', (req) => {
+                const resourceType = req.resourceType();
+                const url = req.url();
 
-        cgpa = result.cgpa;
-        if (cgpa) {
-            debug(`💯 CGPA extracted: ${cgpa}`);
+                // Now ALLOW images and stylesheets but still block other unnecessary resources
+                if (['font', 'media', 'websocket'].includes(resourceType)) {
+                    req.abort();
+                } else if (resourceType === 'script' && !url.includes('tkrcetautonomous')) {
+                    req.abort(); // Block external scripts
+                } else {
+                    req.continue(); // Allow images, stylesheets, documents, xhr, and site scripts
+                }
+            });
+
+            await delay(500);
         }
-        else {
-            debug('❌ CGPA not found, returning default value');
-            cgpa = '-';
+
+        // NOW click the semester button and handle potential navigation
+        debug('🖱️ Clicking semester button...');
+
+        const clickResult = await page.evaluate((semText) => {
+            const inputs = Array.from(document.querySelectorAll('input[type="submit"]'));
+            const semButton = inputs.find(input =>
+                input.value && input.value.includes(semText)
+            );
+
+            if (semButton) {
+                semButton.click();
+                return { clicked: true };
+            }
+            return { clicked: false };
+        }, semesterText);
+
+        if (!clickResult.clicked) {
+            throw new Error('Failed to click semester button');
         }
 
-        console.log("screenshot will most likeyly be destroyed!!");
+        // Wait for potential navigation or page update after clicking
+        try {
+            await Promise.race([
+                page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 3000 }),
+                delay(2000) // Fallback delay
+            ]);
+            debug('✅ Page updated after semester selection');
+        } catch (navError) {
+            debug('⚠️ No navigation detected, assuming page updated in place');
+        }
+
+        // Validate page is still accessible after click
+        const pageStillValid = await isPageValid(page);
+        if (!pageStillValid) {
+            throw new Error('Page became invalid after semester selection');
+        }
+
+        // Extract CGPA after clicking
+        cgpa = await page.evaluate(() => {
+            const cgpaElement = document.getElementById('cpStudCorner_lblFinalCGPA');
+            return cgpaElement ? cgpaElement.innerText.trim() : '-';
+        }).catch(() => preClickResult.cgpa); // Fallback to pre-click CGPA
+
+        if (!cgpa || cgpa === '-') {
+            // Use pre-click CGPA as fallback
+            cgpa = preClickResult.cgpa;
+            if (!cgpa || cgpa === '-') {
+                throw new Error('CGPA not found on page');
+            }
+        }
+
+        debug(`💯 CGPA extracted: ${cgpa}`);
 
         // Wait for images to load and take screenshot (only if we need new screenshots)
         let screenshotSuccess = false;
         if (needsNewScreenshot) {
+            debug('📸 Waiting for images to load and taking full screenshot...');
             try {
+                // Validate page is still valid before screenshot
+                const pageValidForScreenshot = await isPageValid(page);
+                if (!pageValidForScreenshot) {
+                    throw new Error('Page invalid for screenshot');
+                }
+
+                // Wait for all images to load with timeout protection
                 if (!existingSession) {
-
-                    console.log("Waiting for images to load and taking full screenshot...");
-
                     await Promise.race([
                         page.evaluate(() => {
                             const images = Array.from(document.images);
                             const incompleteImages = images.filter(img => !img.complete);
 
-                            const stylesheets = Array.from(document.styleSheets);
-                            const incompleteStylesheets = stylesheets.filter(stylesheet => !stylesheet.cssRules);
-
-                            if (incompleteStylesheets.length === 0) {
-                                return Promise.resolve(); // All stylesheets already loaded
-                            }
+                            // If no incomplete images, resolve immediately
                             if (incompleteImages.length === 0) {
                                 return Promise.resolve(); // All images already loaded
                             }
 
                             return Promise.all(
                                 incompleteImages.map(img => new Promise(resolve => {
-
                                     if (img.complete) {
                                         resolve();
                                     } else {
@@ -450,36 +527,57 @@ app.post('/fetch-grade', async (req, res) => {
                         delay(1000) // Maximum 1 second wait for images
                     ]);
 
-                    await delay(500);
                     // Small delay for rendering
-
+                    await delay(500);
                 }
+                // Take full screenshot without clipping
+                const screenshotData = await page.screenshot({
+                    encoding: 'base64',
+                    type: 'jpeg',
+                    quality: 80, // Slightly higher quality since we're including images
+                    fullPage: true, // Full viewport capture
+                });
 
+                screenshots.push({
+                    name: `${roll}_${semester}_cgpa`,
+                    data: screenshotData
+                });
+
+                debug('📸 Screenshot with images captured successfully');
                 screenshotSuccess = true;
 
             } catch (screenshotError) {
                 debug(`⚠️ Screenshot failed: ${screenshotError.message}`);
                 screenshotSuccess = false;
+                // Try to use existing screenshots ONLY if they're from the same semester
+                const existingSessionData = sessionStore.get(roll);
+                if (existingSessionData &&
+                    existingSessionData.screenshots &&
+                    existingSessionData.screenshots.length > 0 &&
+                    existingSessionData.semester === semester) {
+                    debug('📸 Using existing screenshots as fallback (same semester)');
+                    screenshots = existingSessionData.screenshots;
+                } else {
+                    debug('📸 No valid fallback screenshots available for this semester');
+                    screenshots = []; // No screenshots available
+                }
             }
+        } else {
+            debug('📸 Using cached screenshots, skipping new screenshot');
+            const existingSessionData = sessionStore.get(roll);
+            screenshots = existingSessionData?.screenshots || [];
+            screenshotSuccess = true; // Consider it successful since we're using cached ones
         }
 
-        if (screenshotSuccess) {
-            debug('📸 Taking full screenshot...');
-            const screenshotData = await page.screenshot({
-                encoding: 'base64',
-                type: 'jpeg',
-                quality: 80,
-                fullPage: true,
-            });
-
-            screenshots.push({
-                name: `${roll}_${semester}_cgpa`,
-                data: screenshotData
-            });
-
-            debug('📸 Screenshot with images captured successfully');
+        let sgpaValue;
+        // Always try to calculate SGPA if we have a valid page
+        try {
+            sgpaValue = await sgpa(page);
+            debug(`📊 SGPA calculated: ${sgpaValue}`);
+        } catch (sgpaError) {
+            debug(`⚠️ SGPA calculation failed: ${sgpaError.message}`);
+            sgpaValue = null;
         }
-
         // Update session store with new data
         const session = sessionStore.get(roll);
         if (session) {
@@ -488,23 +586,41 @@ app.post('/fetch-grade', async (req, res) => {
             session.semester = semester;
             session.lastUsed = Date.now();
             session.screenshots = screenshots;
+            session.sgpaValue = sgpaValue;
             debug('✅ Session updated with data');
         }
 
         const totalTime = Date.now() - startTime;
         debug(`✅ Process completed successfully in ${totalTime}ms`);
 
-        res.json({
+        const responseData = {
             cgpa,
             screenshots,
             studentName,
             processingTime: `${totalTime}ms`,
-            cached: false // Always false since we take fresh screenshots
-        });
+            sgpaValue,
+            cached: false
+        };
+        debug(`📤 Sending response with SGPA: ${responseData.sgpaValue}`);
+
+        res.json(responseData);
 
     } catch (error) {
         const totalTime = Date.now() - startTime;
         debug(`❌ Error after ${totalTime}ms: ${error.message}`);
+
+        // Clean up invalid session on error
+        if (sessionStore.has(roll)) {
+            const session = sessionStore.get(roll);
+            try {
+                await session.page?.close();
+                await session.browser?.close();
+            } catch (e) {
+                debug(`⚠️ Error during cleanup: ${e.message}`);
+            }
+            sessionStore.delete(roll);
+            debug('🧹 Cleaned up session due to error');
+        }
 
         res.status(500).json({
             error: error.message,
@@ -527,7 +643,7 @@ app.get('/health', (req, res) => {
 app.get('/', (req, res) => {
     res.json({
         status: 'CGPA Fetcher API - Stable & Fast',
-        version: '2.0',
+        version: '2.1',
         endpoints: {
             '/fetch-grade': 'POST - Fetch student CGPA',
             '/health': 'GET - Health check'
@@ -536,7 +652,6 @@ app.get('/', (req, res) => {
 });
 
 app.listen(PORT, () => {
-
     console.log(`🚀 Stable CGPA Fetcher running on port ${PORT}`);
     debug('✅ Server ready - optimized for speed and stability');
 });
