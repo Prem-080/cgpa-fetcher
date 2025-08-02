@@ -39,7 +39,7 @@ app.use(express.json());
 const debug = (msg) => {
     const timestamp = new Date().toISOString();
     console.log(`[${timestamp}] [DEBUG] ${msg}`);
-    console.error(`[DEBUG] ${msg}`); // Backup for visibility
+    // Removed console.error to prevent Railway from treating debug messages as errors
 };
 
 const sessionStore = new Map(); // Key: roll number, Value: { browser, page, lastUsed, cgpa, studentName, screenshots, semester }
@@ -635,7 +635,9 @@ app.get('/health', (req, res) => {
     res.json({
         status: 'healthy',
         timestamp: new Date().toISOString(),
-        uptime: process.uptime()
+        uptime: process.uptime(),
+        version: '2.1',
+        environment: process.env.NODE_ENV || 'development'
     });
 });
 
@@ -653,5 +655,6 @@ app.get('/', (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`🚀 Stable CGPA Fetcher running on port ${PORT}`);
-    debug('✅ Server ready - optimized for speed and stability');
+    console.log('✅ Server ready - optimized for speed and stability');
+    console.log(`📡 Health check available at: http://localhost:${PORT}/health`);
 });
