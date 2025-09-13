@@ -114,3 +114,5 @@ debug_*.png
 .env.development.local
 .env.test.local
 .env.production.local 
+
+__pycache__
