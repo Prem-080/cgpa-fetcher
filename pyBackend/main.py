@@ -63,7 +63,15 @@ async def fetch_grade(request: GradeRequest):
     try:
         async with async_playwright() as p:
             print("[INFO] Launching Chromium browser...")
-            browser = await p.chromium.launch(headless=True, args=["--no-sandbox"])
+            browser = await p.chromium.launch(
+                headless=True,
+                args=[
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-setuid-sandbox",
+                ],
+            )
+
             page = await browser.new_page()
 
             # Log browser console messages
@@ -73,7 +81,7 @@ async def fetch_grade(request: GradeRequest):
 
             # Block images/fonts for speed
             async def handle_route(route):
-                if route.request.resource_type in ["image","stylesheet","font"]:
+                if route.request.resource_type in ["image", "stylesheet", "font"]:
                     print(f"[DEBUG] Blocking resource: {route.request.url}")
                     await route.abort()
                 else:
@@ -112,29 +120,22 @@ async def fetch_grade(request: GradeRequest):
             await page.wait_for_selector("#cpStudCorner_lblFinalCGPA")
             cgpa = await page.inner_text("#cpStudCorner_lblFinalCGPA")
             print(f"[INFO] Found CGPA: {cgpa}")
-            
+
             await page.unroute("**/*", handle_route)
             # Take screenshot with images loaded
-            await page.reload()  # reload so resources load this time
+            # await page.reload()  # reload so resources load this time
             print("[INFO] Taking screenshot...")
-            
+
             screenshot_bytes = await page.screenshot(full_page=True)
             screenshot_b64 = base64.b64encode(screenshot_bytes).decode("utf-8")
-            try:
-                sgpaValue = await sgpa(page)
-                print(f"[INFO] SGPA Calculated!!! - {sgpaValue}")
-            
-            except e:
-                sgpaValue = None
-                print(f"[INFO] SGPA not calculated!!")
-                
+            sgpaValue = await sgpa(page)
+
             await browser.close()
             print("[INFO] Browser closed")
 
             processing_time = f"{(time.time() - start_time):.2f}s"
             print(f"[INFO] Processing finished in {processing_time}")
 
-            
             return {
                 "studentName": student_name,
                 "cgpa": cgpa,
