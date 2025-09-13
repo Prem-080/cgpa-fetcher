@@ -31,18 +31,7 @@ RUN apt-get update && apt-get install -y \
     libxtst6 \
     libatk-bridge2.0-0 \
     libgtk-3-0 \
-    libxshmfence1 \
-    libxcb1 \
-    libxrender1 \
-    libxext6 \
-    libpci3 \
-    libexpat1 \
-    fonts-ipafont-gothic \
-    fonts-wqy-zenhei \
-    fonts-thai-tlwg \
-    fonts-kacst \
     && rm -rf /var/lib/apt/lists/*
-
 
 # Install Python dependencies
 COPY requirements.txt .
