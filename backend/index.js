@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import puppeteer from 'puppeteer';
+import { chromium } from 'playwright';
 import sgpa from './sgpa_calculator.js'
 import dotenv from 'dotenv';
 
@@ -177,7 +177,7 @@ app.post('/fetch-grade', async (req, res) => {
             const pageValid = await isPageValid(existingSession.page);
 
             if (pageValid) {
-                debug(`✅ Reusing valid browser session for ${roll}`);
+                debug(`✅ Re-using valid browser session for ${roll}`);
                 browser = existingSession.browser;
                 page = existingSession.page;
                 existingSession.lastUsed = Date.now();
@@ -198,8 +198,9 @@ app.post('/fetch-grade', async (req, res) => {
         // Create new browser session if needed
         if (!browser || !page) {
             debug(`🆕 Creating new browser session for ${roll}`);
-            browser = await puppeteer.launch({
-                headless: "new",
+
+            browser = await chromium.launch({
+                headless: true,
                 args: [
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
@@ -212,31 +213,27 @@ app.post('/fetch-grade', async (req, res) => {
                     '--disable-default-apps',
                     '--disable-sync',
                     '--aggressive-cache-discard'
-                ],
-                defaultViewport: { width: 1024, height: 720 }, // Smaller for speed
-                timeout: 8000
+                ]
             });
-
-            page = await browser.newPage();
-
-            // Optimize page settings
-            await page.setExtraHTTPHeaders({
-                'Accept-Language': 'en-US,en;q=0.9'
+            const context = await browser.newContext({
+                viewport: { width: 1024, height: 720 },
+                locale: 'en-US',
+                userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'
             });
+            page = await context.newPage();
 
             // Enhanced request interception
-            await page.setRequestInterception(true);
-            page.on('request', (req) => {
-                const resourceType = req.resourceType();
-                const url = req.url();
-
+            await page.route('**/*', (route) => {
+                const request = route.request();
+                const resourceType = request.resourceType();
+                const url = request.url();
                 // Block unnecessary resources more aggressively
-                if (['image', 'stylesheet', 'font', 'media', 'websocket'].includes(resourceType)) {
-                    req.abort();
+                if (["image", "stylesheet", "font", "media", "websocket"].includes(resourceType)) {
+                    route.abort();
                 } else if (resourceType === 'script' && !url.includes('tkrcetautonomous')) {
-                    req.abort(); // Block external scripts
+                    route.abort();
                 } else {
-                    req.continue();
+                    route.continue();
                 }
             });
 
@@ -416,24 +413,20 @@ app.post('/fetch-grade', async (req, res) => {
             debug('🖼️ Enabling images and stylesheets for screenshot...');
 
             // Remove the previous request interception and set up new one that allows images
-            await page.setRequestInterception(false); // Disable current interception
-            await delay(100);
-            await page.setRequestInterception(true);  // Re-enable with new rules
-            page.removeAllListeners('request'); // Remove old listeners
-            page.on('request', (req) => {
-                const resourceType = req.resourceType();
-                const url = req.url();
-
-                // Now ALLOW images and stylesheets but still block other unnecessary resources
-                if (['font', 'media', 'websocket'].includes(resourceType)) {
-                    req.abort();
+            // Remove previous route and allow images/stylesheets for screenshot
+            await page.unroute('**/*');
+            await page.route('**/*', (route) => {
+                const request = route.request();
+                const resourceType = request.resourceType();
+                const url = request.url();
+                if (["font", "media", "websocket"].includes(resourceType)) {
+                    route.abort();
                 } else if (resourceType === 'script' && !url.includes('tkrcetautonomous')) {
-                    req.abort(); // Block external scripts
+                    route.abort();
                 } else {
-                    req.continue(); // Allow images, stylesheets, documents, xhr, and site scripts
+                    route.continue();
                 }
             });
-
             await delay(500);
         }
 
@@ -531,12 +524,12 @@ app.post('/fetch-grade', async (req, res) => {
                     await delay(500);
                 }
                 // Take full screenshot without clipping
-                const screenshotData = await page.screenshot({
-                    encoding: 'base64',
+                const screenshotBuffer = await page.screenshot({
                     type: 'jpeg',
-                    quality: 80, // Slightly higher quality since we're including images
-                    fullPage: true, // Full viewport capture
+                    quality: 80,
+                    fullPage: true
                 });
+                const screenshotData = screenshotBuffer.toString('base64');
 
                 screenshots.push({
                     name: `${roll}_${semester}_cgpa`,
