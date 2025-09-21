@@ -9,8 +9,6 @@ build/
 dist/
 .next/
 out/
-
-SGPA Calculator
 # Environment variables
 .env
 .env.production
@@ -108,7 +106,11 @@ temp/
 *.jpg
 *.jpeg
 debug_*.png
-pyBackend
+
+# Python backend directory
+pyBackend/
+
+
 # Local development
 .env.local
 .env.development.local
