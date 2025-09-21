@@ -81,7 +81,7 @@ async def fetch_grade(request: GradeRequest):
 
             # Block images/fonts for speed
             async def handle_route(route):
-                if route.request.resource_type in ["image", "stylesheet", "font"]:
+                if route.request.resource_type in ["font"]:
                     print(f"[DEBUG] Blocking resource: {route.request.url}")
                     await route.abort()
                 else:
@@ -121,7 +121,7 @@ async def fetch_grade(request: GradeRequest):
             cgpa = await page.inner_text("#cpStudCorner_lblFinalCGPA")
             print(f"[INFO] Found CGPA: {cgpa}")
 
-            await page.unroute("**/*", handle_route)
+            # await page.unroute("**/*", handle_route)
             # Take screenshot with images loaded
             # await page.reload()  # reload so resources load this time
             print("[INFO] Taking screenshot...")
@@ -153,5 +153,7 @@ async def fetch_grade(request: GradeRequest):
 
 
 # 🚀 Run the server
-if __name__ == "__main__":
+import os
+
+if __name__ == "__main__" and os.environ.get("RAILWAY_ENVIRONMENT") is None:
     uvicorn.run(app, host="0.0.0.0", port=5000)
