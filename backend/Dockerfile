@@ -5,14 +5,17 @@ FROM node:20-slim
 WORKDIR /app
 
 
+
 # Install Playwright dependencies and browsers
 RUN apt-get update && apt-get install -y wget ca-certificates && rm -rf /var/lib/apt/lists/*
+
+# Copy package files and install dependencies
+COPY package*.json ./
 RUN npm install --omit=dev
 RUN npx playwright install --with-deps
 
 
-# Copy package files and install dependencies (already installed above)
-COPY package*.json ./
+
 
 
 # Copy the rest of your code
