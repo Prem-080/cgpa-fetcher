@@ -108,7 +108,7 @@ temp/
 *.jpg
 *.jpeg
 debug_*.png
-
+pyBackend
 # Local development
 .env.local
 .env.development.local
