@@ -7,7 +7,7 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "build": "echo 'No build step required'",
-    "postinstall": "echo 'Post-install complete'"
+    "postinstall": "npx playwright install --with-deps"
   },
   "dependencies": {
     "cors": "^2.8.5",
