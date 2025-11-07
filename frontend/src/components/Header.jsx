@@ -32,7 +32,7 @@ function Header() {
               <span className="hidden sm:inline-block ml-1 text-sm">
                 <img
                   className="inline-block pr-1 text-xl group-hover:animate-pulse"
-                  src="/assets/github-mark/github-mark.png"
+                  src="../../public/assets/github-mark/github-mark.png"
                   alt="GitHub Logo"
                   width={"25px"}
                 />
