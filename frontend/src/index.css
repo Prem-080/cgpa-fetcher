@@ -38,6 +38,16 @@
     }
 }
 
+@media (max-width: 600px) {
+    .cgpa-input {
+        width: 80% ;
+    }
+}
+@media (max-width: 400px) {
+    .cgpa-input {
+        width: 100% ;
+    }
+}
 /* Custom scrollbar for debug console */
 .debug-console {
     scrollbar-width: thin;

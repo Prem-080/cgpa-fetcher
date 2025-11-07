@@ -267,11 +267,11 @@ function App() {
     <>
       <Header />
       <div className="min-h-screen bg-gradient-to-br from-blue-100 to-purple-200 p-4 lg:p-8">
-        <div className="container mx-auto min-h-[calc(100vh-8rem)] w-full flex flex-col justify-center">
-          <div className="lg:flex lg:gap-8 lg:items-start lg:justify-center">
+        <div className="container mx-auto min-h-[calc(100vh-8rem)] w-full">
+          <div className="lg:flex lg:gap-8 lg:items-start lg:justify-center flex flex-col gap-8 items-center justify-start">
             {/* Left Panel - Input Form */}
             <div
-              className={`bg-white p-6 lg:p-8 rounded-xl shadow-lg w-2/5 mb-8 lg:mb-0 `}
+              className={`cgpa-input bg-white p-6 lg:p-8 rounded-xl lg:w-2/4 w-2/3 shadow-lg mb-8 lg:mb-0 `}
             >
               <h1 className="text-2xl font-bold mb-6 text-center text-gray-800 flex items-center justify-center gap-2">
                 <span className="text-3xl">🎓</span> CGPA Fetcher
