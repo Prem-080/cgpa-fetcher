@@ -1,7 +1,16 @@
-# Use the official Node.js image (Debian-based, not alpine/slim)
-FROM mcr.microsoft.com/playwright:v1.43.1-jammy
+# Use Ubuntu 22.04 (Jammy) as the base image
+FROM ubuntu:22.04
 
-# Install additional system dependencies
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install Node.js and npm
+RUN apt-get update && apt-get install -y \
+    curl \
+    && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get install -y nodejs
+
+# Install required dependencies for Playwright
 RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     libnss3 \
@@ -24,13 +33,26 @@ RUN apt-get update && apt-get install -y \
     libpango-1.0-0 \
     libcairo2 \
     libasound2 \
+    libxss1 \
+    libxtst6 \
+    fonts-liberation \
+    fonts-noto-color-emoji \
+    xdg-utils \
+    wget \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
 
-# Copy package files and install dependencies
+# Copy package files
 COPY package*.json ./
+
+# Install production dependencies
+RUN npm install --omit=dev
+
+# Install Playwright browsers and deps
+RUN npx playwright install chromium --with-deps
 RUN npm install --omit=dev
 
 # Copy the rest of your application
