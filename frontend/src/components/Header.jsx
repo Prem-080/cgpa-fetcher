@@ -1,4 +1,5 @@
 import React from "react";
+import githubLogo from "../assets/github-mark/github-mark.png";
 
 function Header() {
   return (
@@ -29,8 +30,13 @@ function Header() {
               rel="noopener noreferrer"
               className="text-gray-600 hover:text-gray-900 transition-all duration-300 hover:scale-110 group"
             >
-              <span className="text-xl group-hover:animate-pulse">📱</span>
               <span className="hidden sm:inline-block ml-1 text-sm">
+                <img
+                  className="inline-block pr-1 text-xl group-hover:animate-pulse"
+                  src={githubLogo}
+                  alt="GitHub Logo"
+                  width={"25px"}
+                />
                 GitHub
               </span>
             </a>
