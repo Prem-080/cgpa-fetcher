@@ -3,17 +3,17 @@ import React from "react";
 function Footer() {
   return (
     <footer className="bg-white/95 backdrop-blur-sm shadow-md mt-8">
-      <div className="container mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="container mx-auto px-4 md:px-20 py-6">
+        <div className="footer-group md:text-sm grid grid-cols-3 md:grid-cols-3 gap-6 text-[10px]">
           {/* Left Section */}
           <div className="text-center md:text-left">
             <h3 className="font-semibold text-gray-800 mb-2">Quick Links</h3>
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1 ">
               <a
                 href="https://www.tkrcet.ac.in"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm text-gray-600 hover:text-blue-600 transition-colors"
+                className="md:text-sm text-gray-600 hover:text-blue-600 transition-colors"
               >
                 TKRCET Website
               </a>
@@ -21,7 +21,7 @@ function Footer() {
                 href="https://www.tkrcetautonomous.org/Login.aspx"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm text-gray-600 hover:text-blue-600 transition-colors"
+                className="md:text-sm text-gray-600 hover:text-blue-600 transition-colors"
               >
                 Results Portal
               </a>
@@ -31,7 +31,7 @@ function Footer() {
           {/* Center Section */}
           <div className="text-center">
             <h3 className="font-semibold text-gray-800 mb-2">About</h3>
-            <p className="text-sm text-gray-600">
+            <p className="md:text-sm text-gray-600">
               A fast and efficient way to check your semester results and CGPA.
               Built with ❤️ for TKRCET students.
             </p>
@@ -43,7 +43,7 @@ function Footer() {
             <div className="flex flex-col gap-1">
               <a
                 href="mailto:premkumar080@gmail.com"
-                className="text-sm text-gray-600 hover:text-blue-600 transition-colors"
+                className="md:text-sm text-gray-600 hover:text-blue-600 transition-colors"
               >
                 Report Issues
               </a>
@@ -51,7 +51,7 @@ function Footer() {
                 href="https://github.com/Prem-080"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm text-gray-600 hover:text-blue-600 transition-colors"
+                className="md:text-sm text-gray-600 hover:text-blue-600 transition-colors"
               >
                 GitHub
               </a>
@@ -60,7 +60,7 @@ function Footer() {
         </div>
 
         {/* Copyright */}
-        <div className="mt-6 pt-4 border-t border-gray-200 text-center text-sm text-gray-600">
+        <div className="mt-6 pt-4 border-t border-gray-200 text-center text-[10px] md:text-sm text-gray-600">
           © {new Date().getFullYear()}. All rights reserved.
         </div>
       </div>

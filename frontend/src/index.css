@@ -48,6 +48,12 @@
         width: 100% ;
     }
 }
+
+@media (min-width: 610px) and (max-width: 768px) {
+    .footer-group {
+        @apply text-[13px];
+    }
+}
 /* Custom scrollbar for debug console */
 .debug-console {
     scrollbar-width: thin;
