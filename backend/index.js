@@ -477,7 +477,7 @@ app.post('/fetch-grade', async (req, res) => {
             // Use pre-click CGPA as fallback
             cgpa = preClickResult.cgpa;
             if (!cgpa || cgpa === '-') {
-                throw new Error('CGPA not found on page');
+                debug('CGPA not found on page');
             }
         }
 
