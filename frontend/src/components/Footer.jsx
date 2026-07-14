@@ -1,14 +1,11 @@
-import React from "react";
-
 function Footer() {
   return (
     <footer className="bg-white/95 backdrop-blur-sm shadow-md mt-8">
       <div className="container mx-auto px-4 md:px-20 py-6">
         <div className="footer-group md:text-sm grid grid-cols-3 md:grid-cols-3 gap-6 text-[10px]">
-          {/* Left Section */}
           <div className="text-center md:text-left">
             <h3 className="font-semibold text-gray-800 mb-2">Quick Links</h3>
-            <div className="flex flex-col gap-1 ">
+            <div className="flex flex-col gap-1">
               <a
                 href="https://www.tkrcet.ac.in"
                 target="_blank"
@@ -28,7 +25,6 @@ function Footer() {
             </div>
           </div>
 
-          {/* Center Section */}
           <div className="text-center">
             <h3 className="font-semibold text-gray-800 mb-2">About</h3>
             <p className="md:text-sm text-gray-600">
@@ -37,7 +33,6 @@ function Footer() {
             </p>
           </div>
 
-          {/* Right Section */}
           <div className="text-center md:text-right">
             <h3 className="font-semibold text-gray-800 mb-2">Contact</h3>
             <div className="flex flex-col gap-1">
@@ -59,9 +54,8 @@ function Footer() {
           </div>
         </div>
 
-        {/* Copyright */}
         <div className="mt-6 pt-4 border-t border-gray-200 text-center text-[10px] md:text-sm text-gray-600">
-          © {new Date().getFullYear()}. All rights reserved.
+          &copy; {new Date().getFullYear()}. All rights reserved.
         </div>
       </div>
     </footer>

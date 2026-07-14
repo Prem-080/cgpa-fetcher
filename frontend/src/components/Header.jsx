@@ -1,4 +1,3 @@
-import React from "react";
 import githubLogo from '../assets/github-mark/github-mark.svg';
 
 function Header() {

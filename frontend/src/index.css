@@ -1,74 +1,92 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-/* Custom styles for better responsiveness */
+@theme {
+  --animate-fadeIn: fadeIn 0.5s ease-out;
+  --animate-slideUp: slideUp 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .result-card {
-    @apply transition-all duration-300 ease-in-out;
-    min-height: 100px;
-    height: 100%;
+  min-height: 100px;
+  height: 100%;
 }
 
 .screenshot-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 1rem;
-    width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+  width: 100%;
 }
 
 .screenshot-item {
-    aspect-ratio: 16/9;
-    width: 100%;
-    position: relative;
-    overflow: hidden;
-    border-radius: 0.5rem;
+  aspect-ratio: 16/9;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.5rem;
 }
 
 .screenshot-img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    background-color: #f8f9fa;
-    transition: transform 0.3s ease;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background-color: #f8f9fa;
+  transition: transform 0.3s ease;
 }
 
 @media (max-width: 640px) {
-    .screenshot-grid {
-        grid-template-columns: 1fr;
-    }
+  .screenshot-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 600px) {
-    .cgpa-input {
-        width: 80% ;
-    }
+  .cgpa-input {
+    width: 80% !important;
+  }
 }
+
 @media (max-width: 400px) {
-    .cgpa-input {
-        width: 100% ;
-    }
+  .cgpa-input {
+    width: 100% !important;
+  }
 }
 
 @media (min-width: 610px) and (max-width: 768px) {
-    .footer-group {
-        @apply text-[13px];
-    }
+  .footer-group {
+    font-size: 13px;
+  }
 }
-/* Custom scrollbar for debug console */
+
 .debug-console {
-    scrollbar-width: thin;
-    scrollbar-color: #4a5568 #1a202c;
+  scrollbar-width: thin;
+  scrollbar-color: #4a5568 #1a202c;
 }
 
 .debug-console::-webkit-scrollbar {
-    width: 8px;
+  width: 8px;
 }
 
 .debug-console::-webkit-scrollbar-track {
-    background: #1a202c;
+  background: #1a202c;
 }
 
 .debug-console::-webkit-scrollbar-thumb {
-    background-color: #4a5568;
-    border-radius: 4px;
+  background-color: #4a5568;
+  border-radius: 4px;
 }
